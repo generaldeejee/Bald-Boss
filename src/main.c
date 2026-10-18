@@ -1,4 +1,4 @@
-/* Bald Boss 3D - PSP Edition. Original noncommercial homebrew source.
+/* Bald Boss 3D - PSP Edition v0.2 (HUD fix). Original homebrew source.
    Uses PSPSDK GU/GUM hardware 3D renderer. No PS1 BIOS calls. */
 #include <pspkernel.h>
 #include <pspctrl.h>
@@ -23,20 +23,17 @@ PSP_MAIN_THREAD_ATTR(THREAD_ATTR_USER | THREAD_ATTR_VFPU);
 #define HAIRS 1250
 #define MAX_HAIR_VERTS (HAIRS*6)
 #define MAX_HEAD_VERTS (HR*HS*6)
-#define HUD_QUADS 140
-#define FONT_GLYPHS 380
+#define HUD_QUADS 4096 /* font is now drawn using reliable solid-color sprite rectangles */
 #define CLAMP(x,a,b) ((x)<(a)?(a):((x)>(b)?(b):(x)))
 #define C(r,g,b) (0xff000000u | ((unsigned)(b)<<16) | ((unsigned)(g)<<8) | (unsigned)(r))
 
 static unsigned int __attribute__((aligned(16))) gu_list[262144];
 static unsigned short __attribute__((aligned(16))) skin_tex[128*128];
-static unsigned short __attribute__((aligned(16))) font_tex[128*128];
 
 typedef struct {float u,v, nx,ny,nz, x,y,z;} TexturedVertex;
 typedef struct {float nx,ny,nz, x,y,z;} LitVertex;
 typedef struct {float x,y,z;} PosVertex;
 typedef struct {unsigned int color;float x,y,z;} UiVertex;
-typedef struct {float u,v,x,y,z;} GlyphVertex;
 typedef struct {float x,y,z,nx,ny,nz,tx,ty,tz,length;unsigned char gone;} Hair;
 
 static TexturedVertex __attribute__((aligned(16))) head[MAX_HEAD_VERTS];
@@ -46,8 +43,7 @@ static int n_feature=0;
 static PosVertex __attribute__((aligned(16))) hair_mesh[MAX_HAIR_VERTS];
 static int n_hair_verts=0;
 static UiVertex __attribute__((aligned(16))) hud[HUD_QUADS*2];
-static GlyphVertex __attribute__((aligned(16))) glyphs[FONT_GLYPHS*2];
-static int n_hud=0,n_glyphs=0;
+static int n_hud=0;
 static Hair hairs[HAIRS];
 static int n_hairs=0, removed=0, score=0;
 static int phase=0,frame=0, play_frames=0;
@@ -56,7 +52,7 @@ static unsigned int prev_buttons=0;
 static unsigned int rand_seed=0xB01D2026u;
 static int shave_flash=0;
 
-/* 5x7 ASCII font: glyphs 32..95. Original data maintained from PS1 version. */
+/* 5x7 ASCII font: glyphs 32..95. We draw it as colored sprites (no texture UVs). */
 static const unsigned char font5[][5]={
 {0,0,0,0,0},{0,0,0x5f,0,0},{0x07,0,0x07,0,0},{0x14,0x7f,0x14,0x7f,0x14},
 {0x24,0x2a,0x7f,0x2a,0x12},{0x23,0x13,0x08,0x64,0x62},{0x36,0x49,0x55,0x22,0x50},{0,0x05,0x03,0,0},
@@ -89,15 +85,7 @@ static void make_textures(void){
     int r=CLAMP(12+grain/2+cheek,0,15),g=CLAMP(9+grain/2,0,15),b=CLAMP(7+grain/3,0,15);
     skin_tex[y*128+x]=(unsigned short)(0xf000|(b<<8)|(g<<4)|r);
   }
-  memset(font_tex,0,sizeof(font_tex));
-  for(int c=0;c<64;c++){
-    int tx=(c%16)*8,ty=(c/16)*8;
-    for(int x=0;x<5;x++)for(int y=0;y<7;y++)if(font5[c][x]&(1u<<y)){
-      font_tex[(ty+y)*128+tx+x]=0xffff;
-      /* Right edge softens sharp 5x7 aliasing without losing pixel styling. */
-      if(x==4)font_tex[(ty+y)*128+tx+x+1]=0x6888;
-    }
-  }
+
 }
 
 static void add_tri(TexturedVertex a,TexturedVertex b,TexturedVertex c){if(n_head+3>MAX_HEAD_VERTS)return;head[n_head++]=a;head[n_head++]=b;head[n_head++]=c;}
@@ -205,20 +193,36 @@ static void ui_box(int x,int y,int w,int h,unsigned int color){
  hud[n_hud++]=(UiVertex){color,(float)x,(float)y,0.0f};
  hud[n_hud++]=(UiVertex){color,(float)(x+w),(float)(y+h),0.0f};
 }
+/* Rasterize the existing 5x7 font as opaque GU_SPRITES rectangles.
+   The prior HUD used normalized 0..1 UVs with PSP's pixel-space texture
+   coordinates: it sampled transparent texels and drew no visible text.
+   This implementation reuses the UI primitive path already proven in PPSSPP.
+   Consecutive vertical pixels are merged into a single rectangle. */
 static void ui_text(float x,float y,const char *s,float scale){
- while(*s&&n_glyphs+2<=FONT_GLYPHS*2){
+ const unsigned int ink=C(241,244,238);
+ while(*s){
    unsigned char c=(unsigned char)*s++;
    if(c>='a'&&c<='z')c=(unsigned char)(c-32);
    if(c<32||c>95)c='?';
-   float u=(float)((c-32)%16)/16.0f,v=(float)((c-32)/16)/16.0f;
-   float delta=1.0f/16.0f;
-   glyphs[n_glyphs++]=(GlyphVertex){u,v,x,y,0.0f};
-   glyphs[n_glyphs++]=(GlyphVertex){u+delta,v+delta,x+8*scale,y+8*scale,0.0f};
-   x+=7*scale;
+   for(int col=0;col<5;col++){
+     unsigned char bits=font5[c-32][col];
+     int row=0;
+     while(row<7){
+       if(!(bits&(1u<<row))){row++;continue;}
+       int first=row;
+       do{row++;}while(row<7 && (bits&(1u<<row)));
+       int x0=(int)(x+col*scale+0.5f);
+       int x1=(int)(x+(col+1)*scale+0.5f);
+       int y0=(int)(y+first*scale+0.5f);
+       int y1=(int)(y+row*scale+0.5f);
+       if(x1>x0 && y1>y0)ui_box(x0,y0,x1-x0,y1-y0,ink);
+     }
+   }
+   x+=7.0f*scale;
  }
 }
 static void draw_ui(void){
-  n_hud=0;n_glyphs=0;
+  n_hud=0;
   /* Overlay backgrounds and barber-shop graphic accents. */
   ui_box(0,0,SW,43,C(10,16,27));
   ui_box(0,43,SW,2,C(64,184,179));
@@ -267,15 +271,7 @@ static void draw_ui(void){
   sceKernelDcacheWritebackAll();
   sceGuDisable(GU_LIGHTING);sceGuDisable(GU_DEPTH_TEST);sceGuDisable(GU_TEXTURE_2D);sceGuDisable(GU_BLEND);
   sceGuDrawArray(GU_SPRITES,GU_COLOR_8888|GU_VERTEX_32BITF|GU_TRANSFORM_2D,n_hud,0,hud);
-  sceGuEnable(GU_TEXTURE_2D);sceGuEnable(GU_BLEND);
-  sceGuBlendFunc(GU_ADD,GU_SRC_ALPHA,GU_ONE_MINUS_SRC_ALPHA,0,0);
-  sceGuTexMode(GU_PSM_4444,0,0,0);
-  sceGuTexImage(0,128,128,128,font_tex);
-  sceGuTexFunc(GU_TFX_MODULATE,GU_TCC_RGBA);
-  sceGuTexFilter(GU_NEAREST,GU_NEAREST);
-  sceGuColor(0xffffffff);
-  sceGuDrawArray(GU_SPRITES,GU_TEXTURE_32BITF|GU_VERTEX_32BITF|GU_TRANSFORM_2D,n_glyphs,0,glyphs);
-  sceGuDisable(GU_BLEND);sceGuDisable(GU_TEXTURE_2D);
+  /* All HUD rectangles and letters are now drawn by the call above. */
 }
 
 static void render_head(void){
