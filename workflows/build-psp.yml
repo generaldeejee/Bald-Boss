@@ -1,0 +1,29 @@
+name: Build PSP EBOOT
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "src/**"
+      - "assets/**"
+      - "Makefile"
+      - ".github/workflows/build-psp.yml"
+jobs:
+  psp-build:
+    runs-on: ubuntu-latest
+    container:
+      image: pspdev/pspdev:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build with PSPSDK
+        run: make -j2
+      - name: Check produced EBOOT
+        run: |
+          test -s EBOOT.PBP
+          file EBOOT.PBP || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BaldBoss3D-PSP-EBOOT
+          path: |
+            EBOOT.PBP
+            assets/ICON0.PNG
+          if-no-files-found: error
