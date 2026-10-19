@@ -62,8 +62,9 @@ def sing_melody(signal, sample_rate, notes):
             np.linspace(0, 1, len(signal)),
             np.linspace(0, 1, len(shifted)), shifted
         )
-    # Retain a little of the natural articulation and original consonants.
-    return (.13 * signal + .87 * shifted).astype(np.float32)
+    # Very little of the spoken fundamental may bleed through, or it
+    # destabilizes the composed notes. TD-PSOLA already preserves consonants.
+    return (.03 * signal + .97 * shifted).astype(np.float32)
 
 
 def foreground_vocal_mix(instrumental, vocal, sample_rate):
