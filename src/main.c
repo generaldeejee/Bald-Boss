@@ -1,4 +1,4 @@
-/* Bald Boss 3D - PSP Edition v0.7.0 barber UI, restart and finish camera with Deep Voice soundtrack. Original homebrew source.
+/* Bald Boss 3D - PSP Edition v0.7.1 UV face mapping fix barber UI, restart and finish camera with Deep Voice soundtrack. Original homebrew source.
    Uses PSPSDK GU/GUM hardware 3D renderer. No PS1 BIOS calls. */
 #include <pspkernel.h>
 #include <pspctrl.h>
@@ -37,7 +37,7 @@ PSP_MAIN_THREAD_ATTR(THREAD_ATTR_USER | THREAD_ATTR_VFPU);
 #define C(r,g,b) (0xff000000u | ((unsigned)(b)<<16) | ((unsigned)(g)<<8) | (unsigned)(r))
 
 static unsigned int __attribute__((aligned(16))) gu_list[262144];
-static unsigned short __attribute__((aligned(16))) skin_tex[128*128];
+static unsigned short __attribute__((aligned(16))) skin_tex[256*256];
 
 typedef struct {float u,v, nx,ny,nz, x,y,z;} TexturedVertex;
 #include "head_model.h"
@@ -524,9 +524,15 @@ static void render_head(void){
   sceGuAmbientColor(0xffffffff);
   sceGuEnable(GU_TEXTURE_2D);
   sceGuTexMode(GU_PSM_5650,0,0,0);
-  sceGuTexImage(0,128,128,128,skin_tex);
+  sceGuTexImage(0,HEAD_TEX_W,HEAD_TEX_H,HEAD_TEX_W,skin_tex);
+  /* The imported OBJ stores UVs as 0..127. Normalize to 0..1 for
+     the PSP 3D GPU, otherwise the face texture repeats 127 times. */
+  sceGuTexMapMode(GU_TEXTURE_COORDS,0,0);
+  sceGuTexScale(1.0f/127.0f,1.0f/127.0f);
+  sceGuTexOffset(0.0f,0.0f);
+  sceGuTexWrap(GU_CLAMP,GU_CLAMP);
   sceGuTexFunc(GU_TFX_REPLACE,GU_TCC_RGB);
-  sceGuTexFilter(GU_NEAREST,GU_NEAREST);
+  sceGuTexFilter(GU_LINEAR,GU_LINEAR);
   sceGuDisable(GU_LIGHTING); /* show face texture clearly instead of washing it out */
   sceGuColor(0xffffffff);
   sceGumDrawArray(GU_TRIANGLES,
