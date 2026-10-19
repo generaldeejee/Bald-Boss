@@ -91,3 +91,16 @@ Bald_Boss_3D_PSP/
 ## Credits
 
 Bald Boss 3D game concept and source generated in collaboration with ChatGPT. Original project started as a PS1 homebrew and is rewritten here for PSP. Licensed under MIT; see LICENSE.
+
+
+## v0.6.5 – Tondeuse, zoom en stem
+
+- **X of vierkant ingedrukt houden:** scheren met een gegenereerd tondeusegeluid.
+- **Cirkel:** drie zoomstanden (1×, ongeveer 1,4× en 1,8×). De scheerhitbox beweegt mee met de zoom.
+- **Volledig kaal vóór de tijd op is:** eenmalige stemmelding **“Another bald boss!”**.
+- **L/R:** hoofd draaien. **D-pad/analoge stick:** tondeuse bewegen.
+- **SELECT:** achtergrondmuziek aan/uit, geluidseffecten blijven hoorbaar.
+
+De audiothread mengt de bestaande chiptune met een originele, programmatisch gemaakte tondeusebrom en een met de vrije eSpeak-synthesizer gemaakte Engelse stem. GitHub Actions genereert via \`tools/generate_voice.py\` eerst een PCM8-header en bouwt daarna \`EBOOT.PBP\`. Lokaal bouwen: installeer eSpeak, voer \`python3 tools/generate_voice.py\` uit en daarna \`make\` met PSPDEV.
+
+De code heeft lokale host-syntax- en gameplaytests doorstaan. De werkelijke PSPDEV-build en PPSSPP-weergave moeten nog worden gecontroleerd.
