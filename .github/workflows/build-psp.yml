@@ -33,8 +33,73 @@ jobs:
           test -s src/voice_sample.h
           test -s src/music_samples.h
           grep -q '^#define VOICE_SAMPLE_RATE 22050$' src/voice_sample.h
-          grep -q '^#define BALD_BOSS_VOICE_ENGINE_PIPER 1$' src/voice_sample.h
-          echo "Piper neural announcer generated (22.05 kHz)"
+          grep -q '^#define BALD_BOSS_VOICE_ENGINE_PIPER 1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BaldBoss-PSP-Audio
+          path: |
+            src/voice_sample.h
+            src/music_samples.h
+          if-no-files-found: error
+  psp-build:
+    needs: generate-audio
+    runs-on: ubuntu-latest
+    container:
+      image: pspdev/pspdev:latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: BaldBoss-PSP-Audio
+          path: src
+      - name: Build with PSPSDK
+        run: make -j2
+      - name: Check produced EBOOT
+        run: |
+          test -s EBOOT.PBP
+          file EBOOT.PBP || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BaldBoss3D-PSP-EBOOT
+          path: |
+            EBOOT.PBP
+            assets/ICON0.PNG
+          if-no-files-found: error
+ src/voice_sample.h
+          grep -q '^#define BALD_BOSS_MUSIC_VOCALS_PIPER 1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BaldBoss-PSP-Audio
+          path: |
+            src/voice_sample.h
+            src/music_samples.h
+          if-no-files-found: error
+  psp-build:
+    needs: generate-audio
+    runs-on: ubuntu-latest
+    container:
+      image: pspdev/pspdev:latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: BaldBoss-PSP-Audio
+          path: src
+      - name: Build with PSPSDK
+        run: make -j2
+      - name: Check produced EBOOT
+        run: |
+          test -s EBOOT.PBP
+          file EBOOT.PBP || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BaldBoss3D-PSP-EBOOT
+          path: |
+            EBOOT.PBP
+            assets/ICON0.PNG
+          if-no-files-found: error
+ src/music_samples.h
+          echo "Piper neural announcer and expressive menu-song vocals generated"
       - uses: actions/upload-artifact@v4
         with:
           name: BaldBoss-PSP-Audio
