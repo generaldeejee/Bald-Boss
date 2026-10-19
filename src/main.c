@@ -1,4 +1,4 @@
-/* Bald Boss 3D - PSP Edition v0.5.1 (font readability fix, recessed eyes, intro). Original homebrew source.
+/* Bald Boss 3D - PSP Edition v0.6.3 OBJ head + more realistic UV face texture. Original homebrew source.
    Uses PSPSDK GU/GUM hardware 3D renderer. No PS1 BIOS calls. */
 #include <pspkernel.h>
 #include <pspctrl.h>
@@ -30,7 +30,7 @@ PSP_MAIN_THREAD_ATTR(THREAD_ATTR_USER | THREAD_ATTR_VFPU);
 #define CAM_Y 0.08f
 #define FOCAL_PIXELS 312.5f
 #define MAX_HAIR_VERTS (HAIRS*6)
-#define MAX_HEAD_VERTS (HR*HS*6)
+#define MAX_HEAD_VERTS 11000
 #define HUD_QUADS 4096 /* font is now drawn using reliable solid-color sprite rectangles */
 #define CLAMP(x,a,b) ((x)<(a)?(a):((x)>(b)?(b):(x)))
 #define C(r,g,b) (0xff000000u | ((unsigned)(b)<<16) | ((unsigned)(g)<<8) | (unsigned)(r))
@@ -39,6 +39,8 @@ static unsigned int __attribute__((aligned(16))) gu_list[262144];
 static unsigned short __attribute__((aligned(16))) skin_tex[128*128];
 
 typedef struct {float u,v, nx,ny,nz, x,y,z;} TexturedVertex;
+#include "head_model.h"
+#include "head_texture.h"
 typedef struct {float nx,ny,nz, x,y,z;} LitVertex;
 typedef struct {float x,y,z;} PosVertex;
 typedef struct {unsigned int color;float x,y,z;} UiVertex;
@@ -92,72 +94,11 @@ static float fsq(float a){return a*a;}
 static void normalize(float *x,float *y,float *z){float l=sqrtf(fsq(*x)+fsq(*y)+fsq(*z));if(l>0.000001f){*x/=l;*y/=l;*z/=l;}}
 static float wrap01dist(float a,float b){float d=fabsf(a-b);return d<(1.0f-d)?d:(1.0f-d);}
 
-/* RGB565 offers smoother complexion gradients than the original 4-bit RGB4444.
-   The colour noise is subtle, rather than high-contrast random mottling. */
+/* RGB565 texture adapted from a CC0 OpenGameArt face texture.
+   The PSP keeps it at 128x128 to stay cache-friendly and lightweight. */
 
 static void make_textures(void){
-  for(int y=0;y<128;y++)for(int x=0;x<128;x++){
-    float u=(float)x/127.0f;
-    float v=(float)y/127.0f;
-    float ang=u*2.0f*PI;
-    float front=fmaxf(cosf(ang),0.0f);
-    float side=sinf(ang);
-    float cheek=expf(-fsq(v-0.56f)*55.0f)*(expf(-fsq(side-0.42f)*18.0f)+expf(-fsq(side+0.42f)*18.0f))*front;
-    int grain=(int)(((x*1973u+y*9277u+89173u)^rand_seed)&7)-3;
-    int r=208+grain+(int)(cheek*12.0f);
-    int g=169+grain+(int)(cheek*4.0f);
-    int b=141+grain-(int)(front*3.0f);
-    /* Soft facial shading and temple falloff. */
-    float temple=(expf(-fsq(side-0.70f)*10.0f)+expf(-fsq(side+0.70f)*10.0f))*expf(-fsq(v-0.42f)*18.0f)*front;
-    r-=(int)(temple*10.0f); g-=(int)(temple*9.0f); b-=(int)(temple*8.0f);
-    /* Brow shadows. */
-    float brow=(expf(-fsq(side-0.26f)*58.0f)+expf(-fsq(side+0.26f)*58.0f))*expf(-fsq(v-0.36f)*240.0f)*front;
-    r-=(int)(brow*72.0f); g-=(int)(brow*60.0f); b-=(int)(brow*49.0f);
-    /* Eye whites, irises and pupils painted into the texture to keep the face unified. */
-    float eyeL=expf(-fsq(side+0.24f)*105.0f-fsq(v-0.455f)*520.0f)*front;
-    float eyeR=expf(-fsq(side-0.24f)*105.0f-fsq(v-0.455f)*520.0f)*front;
-    float irisL=expf(-fsq(side+0.24f)*370.0f-fsq(v-0.458f)*1250.0f)*front;
-    float irisR=expf(-fsq(side-0.24f)*370.0f-fsq(v-0.458f)*1250.0f)*front;
-    float pupilL=expf(-fsq(side+0.24f)*1000.0f-fsq(v-0.458f)*2300.0f)*front;
-    float pupilR=expf(-fsq(side-0.24f)*1000.0f-fsq(v-0.458f)*2300.0f)*front;
-    if(eyeL+eyeR>0.04f){r+=(int)((eyeL+eyeR)*42.0f);g+=(int)((eyeL+eyeR)*41.0f);b+=(int)((eyeL+eyeR)*32.0f);}    
-    if(irisL>0.02f){r=(int)(r*(1.0f-irisL)+irisL*90.0f);g=(int)(g*(1.0f-irisL)+irisL*126.0f);b=(int)(b*(1.0f-irisL)+irisL*116.0f);}    
-    if(irisR>0.02f){r=(int)(r*(1.0f-irisR)+irisR*90.0f);g=(int)(g*(1.0f-irisR)+irisR*126.0f);b=(int)(b*(1.0f-irisR)+irisR*116.0f);}    
-    if(pupilL+pupilR>0.03f){r=(int)(r*(1.0f-(pupilL+pupilR))+7.0f*(pupilL+pupilR));g=(int)(g*(1.0f-(pupilL+pupilR))+12.0f*(pupilL+pupilR));b=(int)(b*(1.0f-(pupilL+pupilR))+14.0f*(pupilL+pupilR));}
-    /* Nose bridge highlight and nostril shadow. */
-    float bridge=expf(-fsq(side)*180.0f-fsq(v-0.53f)*55.0f)*front;
-    r+=(int)(bridge*10.0f); g+=(int)(bridge*6.0f); b+=(int)(bridge*4.0f);
-    float nost=(expf(-fsq(side-0.06f)*900.0f)+expf(-fsq(side+0.06f)*900.0f))*expf(-fsq(v-0.63f)*1500.0f)*front;
-    r-=(int)(nost*56.0f); g-=(int)(nost*42.0f); b-=(int)(nost*38.0f);
-    /* Lips. */
-    float upper_lip=expf(-fsq(side)*80.0f-fsq(v-0.73f)*1000.0f)*front;
-    float lower_lip=expf(-fsq(side)*65.0f-fsq(v-0.775f)*620.0f)*front;
-    if(upper_lip>0.02f||lower_lip>0.02f){
-      float lip=fminf(1.0f,upper_lip*1.2f+lower_lip);
-      r=(int)(r*(1.0f-lip)+lip*145.0f);
-      g=(int)(g*(1.0f-lip)+lip*96.0f);
-      b=(int)(b*(1.0f-lip)+lip*95.0f);
-    }
-    /* Moustache shadow and beard stubble dots. */
-    float moust=expf(-fsq(side)*70.0f-fsq(v-0.69f)*650.0f)*front;
-    r-=(int)(moust*10.0f); g-=(int)(moust*9.0f); b-=(int)(moust*7.0f);
-    unsigned int h=(unsigned int)(x*7411u+y*1597u+12345u);
-    float beard_zone=front*CLAMP((v-0.67f)/0.23f,0.0f,1.0f)*(1.0f-CLAMP((v-0.95f)/0.06f,0.0f,1.0f));
-    if(beard_zone>0.0f && ((h>>2)&31u)==0u && fabsf(side)<0.58f+0.12f*(v-0.67f)){
-      r-=(int)(18.0f*beard_zone); g-=(int)(16.0f*beard_zone); b-=(int)(15.0f*beard_zone);
-    }
-    /* Hairline and scalp stubble. */
-    float top_hair=(v<0.27f?1.0f-v/0.27f:0.0f)*(0.45f+0.55f*front);
-    if(top_hair>0.0f && ((h>>5)&7u)==0u && fabsf(side)<0.88f){
-      r=(int)(r*(1.0f-top_hair*0.62f)+28.0f*(top_hair*0.62f));
-      g=(int)(g*(1.0f-top_hair*0.62f)+22.0f*(top_hair*0.62f));
-      b=(int)(b*(1.0f-top_hair*0.62f)+20.0f*(top_hair*0.62f));
-    }
-    /* Soft cheek tint. */
-    r+= (int)(cheek*4.0f); g-= (int)(cheek*1.0f);
-    r=CLAMP(r,0,255); g=CLAMP(g,0,255); b=CLAMP(b,0,255);
-    skin_tex[y*128+x]=(unsigned short)(((b>>3)<<11)|((g>>2)<<5)|(r>>3));
-  }
+ for(int i=0;i<HEAD_TEX_W*HEAD_TEX_H;i++) skin_tex[i]=head_texture_cc0[i];
 }
 
 static void add_tri(TexturedVertex a,TexturedVertex b,TexturedVertex c){if(n_head+3>MAX_HEAD_VERTS)return;head[n_head++]=a;head[n_head++]=b;head[n_head++]=c;}
@@ -205,13 +146,8 @@ static TexturedVertex surface(float a,float p){
   return v;
 }
 static void make_head(void){
-  n_head=0;
-  for(int a=0;a<HR;a++)for(int p=0;p<HS;p++){
-    float a0=(float)a*PI/HR,a1=(float)(a+1)*PI/HR;
-    float p0=(float)p*2.0f*PI/HS,p1=(float)(p+1)*2.0f*PI/HS;
-    TexturedVertex v0=surface(a0,p0),v1=surface(a1,p0),v2=surface(a0,p1),v3=surface(a1,p1);
-    add_tri(v0,v1,v2);add_tri(v2,v1,v3);
-  }
+  n_head=HEAD_MODEL_INDEX_COUNT;
+  for(int i=0;i<n_head;i++)head[i]=head_model_vertices[head_model_indices[i]];
 }
 static void add_lit(LitVertex a,LitVertex b,LitVertex c){if(n_feature+3>4096)return;feature[n_feature++]=a;feature[n_feature++]=b;feature[n_feature++]=c;}
 static void make_ellipsoid(float cx,float cy,float cz,float rx,float ry,float rz,int rings,int slices){
@@ -241,48 +177,54 @@ static void draw_ellipsoid(float x,float y,float z,float rx,float ry,float rz,un
 
 
 static void make_hairs(void){
- n_hairs=0;
- for(int i=0;i<HAIRS;i++){
-   float a=0.10f+1.38f*sqrtf(rand01());
-   float p=2.0f*PI*rand01();
-   float cp=cosf(p),sp=sinf(p);
-   /* Receding temples and slightly thinner crown, like close-cropped stubble. */
-   float density=1.0f;
-   if(cp>0.42f && fabsf(sp)>0.62f && a<0.58f)density*=0.18f;
-   if(a<0.26f)density*=0.42f;
-   if(rand01()>density)continue;
-   TexturedVertex v=surface(a,p);
-   Hair *h=&hairs[n_hairs++];
-   h->x=v.x;h->y=v.y;h->z=v.z;
-   h->nx=v.nx;h->ny=v.ny;h->nz=v.nz;
-   h->tx=cp;h->ty=0;h->tz=-sp;
-   float twist=(rand01()-.5f)*.35f;
-   h->tx+=twist;h->tz+=twist*.25f;
-   normalize(&h->tx,&h->ty,&h->tz);
-   h->length=0.020f+0.020f*rand01();
-   h->gone=0;
- }
+  n_hairs=0;
+  /* Sample the real imported scalp rather than projecting onto the old sphere. */
+  for(int tries=0; tries<HAIRS*28 && n_hairs<HAIRS;tries++){
+    int tri=((int)(rand01()*(n_head/3)))*3;
+    if(tri<0||tri+2>=n_head)continue;
+    TexturedVertex *a=&head[tri], *b=&head[tri+1], *c=&head[tri+2];
+    float r=sqrtf(rand01()), t=rand01();
+    float wa=1.0f-r,wb=r*(1.0f-t),wc=r*t;
+    float x=wa*a->x+wb*b->x+wc*c->x;
+    float y=wa*a->y+wb*b->y+wc*c->y;
+    float z=wa*a->z+wb*b->z+wc*c->z;
+    if(y<0.33f || (z>0.58f && y<0.73f))continue;
+    float nx=wa*a->nx+wb*b->nx+wc*c->nx;
+    float ny=wa*a->ny+wb*b->ny+wc*c->ny;
+    float nz=wa*a->nz+wb*b->nz+wc*c->nz;
+    normalize(&nx,&ny,&nz);
+    Hair *h=&hairs[n_hairs++];
+    h->x=x;h->y=y;h->z=z;h->nx=nx;h->ny=ny;h->nz=nz;
+    h->tx=nz;h->ty=0;h->tz=-nx;
+    normalize(&h->tx,&h->ty,&h->tz);
+    h->length=.022f+.028f*rand01();h->gone=0;
+  }
 }
 
 /* Dense facial shadow: tiny low-contrast triangular strands on jaw and cheeks.
    Generate this once, draw with depth testing like the scalp hair. */
 static void make_beard_stubble(void){
- n_beard_stubble=0;
- for(int i=0;i<FACE_STUBBLE;i++){
-  float a=1.87f+.83f*rand01();
-  float p=(rand01()-.5f)*2.25f;
-  TexturedVertex v=surface(a,p);
-  if(v.y>-.27f && fabsf(v.x)<.19f)continue;
-  float side=cosf(p),forward=-sinf(p);
-  float off=.013f;
-  float x=v.x+v.nx*off,y=v.y+v.ny*off,z=v.z+v.nz*off;
-  float w=.0030f+.0025f*rand01();
-  float h=.006f+.006f*rand01();
-  if(n_beard_stubble+3>FACE_STUBBLE*3)break;
-  beard_stubble[n_beard_stubble++]=(PosVertex){x-w*side,y,z-w*forward};
-  beard_stubble[n_beard_stubble++]=(PosVertex){x+w*side,y,z+w*forward};
-  beard_stubble[n_beard_stubble++]=(PosVertex){x+v.nx*h,y+h*.35f,z+v.nz*h};
- }
+  n_beard_stubble=0;
+  for(int tries=0;tries<FACE_STUBBLE*18 && n_beard_stubble<FACE_STUBBLE*3-3;tries++){
+    int tri=((int)(rand01()*(n_head/3)))*3;
+    if(tri<0||tri+2>=n_head)continue;
+    TexturedVertex *a=&head[tri], *b=&head[tri+1], *c=&head[tri+2];
+    float r=sqrtf(rand01()), t=rand01();
+    float w0=1.0f-r,w1=r*(1.0f-t),w2=r*t;
+    float y=w0*a->y+w1*b->y+w2*c->y;
+    float z=w0*a->z+w1*b->z+w2*c->z;
+    if(y>-.16f||y<-.85f||z<.34f)continue;
+    float x=w0*a->x+w1*b->x+w2*c->x;
+    float nx=w0*a->nx+w1*b->nx+w2*c->nx;
+    float ny=w0*a->ny+w1*b->ny+w2*c->ny;
+    float nz=w0*a->nz+w1*b->nz+w2*c->nz;
+    normalize(&nx,&ny,&nz);
+    x+=nx*.010f;y+=ny*.010f;z+=nz*.010f;
+    float w=.003f,h=.007f;
+    beard_stubble[n_beard_stubble++]=(PosVertex){x-w,y,z};
+    beard_stubble[n_beard_stubble++]=(PosVertex){x+w,y,z};
+    beard_stubble[n_beard_stubble++]=(PosVertex){x+nx*h,y+h*.5f,z+nz*h};
+  }
 }
 static void draw_beard_stubble(void){
  sceGuDisable(GU_TEXTURE_2D);sceGuDisable(GU_LIGHTING);
@@ -328,8 +270,6 @@ static void ui_box(int x,int y,int w,int h,unsigned int color){
    This implementation reuses the UI primitive path already proven in PPSSPP.
    Consecutive vertical pixels are merged into a single rectangle. */
 static void ui_text(float x,float y,const char *s,float scale){
- /* Prevent subpixel 5x7 columns from rounding to zero width.
-    For example the L in ONLY loses its left stroke at scale 0.90. */
  if(scale<1.0f)scale=1.0f;
  const unsigned int ink=C(241,244,238);
  while(*s){
@@ -353,6 +293,7 @@ static void ui_text(float x,float y,const char *s,float scale){
    x+=7.0f*scale;
  }
 }
+
 static void draw_ui(void){
   n_hud=0;
   ui_box(0,0,SW,43,C(10,16,27));
@@ -415,9 +356,11 @@ static void draw_ui(void){
   sceGuDrawArray(GU_SPRITES,GU_COLOR_8888|GU_VERTEX_32BITF|GU_TRANSFORM_2D,n_hud,0,hud);
 }
 
+
+
 static void render_head(void){
-  /* Perspective projection, real depth test, smooth per-vertex normals. */
-  sceGumMatrixMode(GU_PROJECTION);sceGumLoadIdentity();sceGumPerspective(47.0f,(float)SW/SH,0.1f,20.0f);
+  sceGumMatrixMode(GU_PROJECTION);sceGumLoadIdentity();
+  sceGumPerspective(47.0f,(float)SW/SH,0.1f,20.0f);
   sceGumMatrixMode(GU_VIEW);sceGumLoadIdentity();
   sceGumMatrixMode(GU_MODEL);sceGumLoadIdentity();
   /* Smaller portrait on the title screen makes room for the introduction. */
@@ -441,47 +384,15 @@ static void render_head(void){
   sceGuTexFunc(GU_TFX_MODULATE,GU_TCC_RGB);
   sceGuTexFilter(GU_LINEAR,GU_LINEAR);
   sceGuColor(0xffffffff);
-  sceGumDrawArray(GU_TRIANGLES,GU_TEXTURE_32BITF|GU_NORMAL_32BITF|GU_VERTEX_32BITF|GU_TRANSFORM_3D,n_head,0,head);
+  sceGumDrawArray(GU_TRIANGLES,
+    GU_TEXTURE_32BITF|GU_NORMAL_32BITF|GU_VERTEX_32BITF|GU_TRANSFORM_3D,
+    n_head,0,head);
   draw_beard_stubble();
-  /* Compact ears; eyes recessed into the actual eye sockets. */
-  for(int side=-1;side<=1;side+=2){
-    float sign=(float)side;
-    draw_ellipsoid(sign*.81f,-.07f,-.03f,.158f,.226f,.107f,C(205,150,124),10,14);
-    draw_ellipsoid(sign*.855f,-.05f,.047f,.063f,.132f,.030f,C(140,91,80),8,12);
-    /* Face surface at x=+/-0.29,y=0.10 is approximately z=0.68. */
-    draw_ellipsoid(sign*.292f,.102f,.665f,.157f,.082f,.060f,C(134,89,78),9,14);
-    draw_ellipsoid(sign*.292f,.102f,.686f,.127f,.064f,.045f,C(237,229,210),10,16);
-    draw_ellipsoid(sign*.292f,.102f,.727f,.049f,.049f,.012f,C(85,121,108),8,12);
-    draw_ellipsoid(sign*.292f,.102f,.740f,.024f,.037f,.009f,C(24,30,30),7,10);
-    draw_ellipsoid(sign*.311f,.125f,.751f,.010f,.011f,.005f,C(245,242,231),5,8);
-    draw_ellipsoid(sign*.292f,.171f,.705f,.163f,.023f,.027f,C(185,124,102),6,14);
-    draw_ellipsoid(sign*.292f,.048f,.700f,.163f,.022f,.024f,C(173,118,101),5,14);
-    draw_ellipsoid(sign*.303f,.254f,.661f,.191f,.026f,.029f,C(66,47,42),6,14);
-  }
-  /* Nose bridge, tip and inset nostrils. */
-  draw_ellipsoid(0.0f,-.030f,.776f,.079f,.203f,.082f,C(210,153,126),12,16);
-  draw_ellipsoid(0.0f,-.214f,.869f,.127f,.073f,.082f,C(220,161,132),12,18);
-  draw_ellipsoid(-.095f,-.252f,.862f,.054f,.045f,.041f,C(204,144,118),9,12);
-  draw_ellipsoid(.095f,-.252f,.862f,.054f,.045f,.041f,C(204,144,118),9,12);
-  draw_ellipsoid(-.083f,-.292f,.894f,.028f,.016f,.011f,C(82,52,47),6,11);
-  draw_ellipsoid(.083f,-.292f,.894f,.028f,.016f,.011f,C(82,52,47),6,11);
-  /* Flatter upper and lower lip and a chin contour. */
-  draw_ellipsoid(0.0f,-.440f,.735f,.189f,.030f,.028f,C(153,94,86),8,16);
-  draw_ellipsoid(0.0f,-.472f,.745f,.182f,.013f,.021f,C(93,57,55),7,16);
-  draw_ellipsoid(0.0f,-.510f,.742f,.178f,.035f,.032f,C(186,114,102),8,16);
-  draw_ellipsoid(0.0f,-.633f,.700f,.186f,.054f,.021f,C(187,132,112),8,15);
-  if(shades_on){
-    for(int side=-1;side<=1;side+=2){
-      float sign=(float)side;
-      draw_ellipsoid(sign*.292f,.110f,.756f,.244f,.115f,.032f,C(17,29,39),9,17);
-      draw_ellipsoid(sign*.292f,.208f,.746f,.253f,.026f,.025f,C(33,29,28),6,16);
-    }
-    draw_ellipsoid(0.0f,.155f,.802f,.092f,.020f,.027f,C(178,140,80),6,13);
-  }
-  draw_ellipsoid(0.0f,-1.13f,-.11f,.34f,.42f,.30f,C(186,126,103),10,14);
-  draw_ellipsoid(0.0f,-1.72f,-.28f,1.12f,.56f,.52f,C(31,47,68),9,18);
+  /* The CC0 imported mesh already includes anatomical nose, lips, jaw, ears
+     and shoulders. Do not overlay primitive spheres on it. */
   draw_hair();
 }
+
 
 static void reset_game(void){
   for(int i=0;i<n_hairs;i++)hairs[i].gone=0;
