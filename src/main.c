@@ -1,4 +1,4 @@
-/* Bald Boss 3D - PSP Edition v0.8.1 tactile shaving new anatomical head, UV texture and crown pitch controls barber UI, restart and finish camera with Deep Voice soundtrack. Original homebrew source.
+/* Bald Boss 3D - PSP Edition v0.8.2 smooth shaved scalp and specular light new anatomical head, UV texture and crown pitch controls barber UI, restart and finish camera with Deep Voice soundtrack. Original homebrew source.
    Uses PSPSDK GU/GUM hardware 3D renderer. No PS1 BIOS calls. */
 #include <pspkernel.h>
 #include <pspctrl.h>
@@ -34,6 +34,7 @@ PSP_MAIN_THREAD_ATTR(THREAD_ATTR_USER | THREAD_ATTR_VFPU);
 #define HUD_QUADS 4096 /* font is now drawn using reliable solid-color sprite rectangles */
 #define BG_QUADS 768
 #define SHAVING_FX 72
+#define SKIN_TEXELS (256*256)
 #define CLAMP(x,a,b) ((x)<(a)?(a):((x)>(b)?(b):(x)))
 #define C(r,g,b) (0xff000000u | ((unsigned)(b)<<16) | ((unsigned)(g)<<8) | (unsigned)(r))
 
@@ -47,7 +48,8 @@ typedef struct {float u,v, nx,ny,nz, x,y,z;} TexturedVertex;
 typedef struct {float nx,ny,nz, x,y,z;} LitVertex;
 typedef struct {float x,y,z;} PosVertex;
 typedef struct {unsigned int color;float x,y,z;} UiVertex;
-typedef struct {float x,y,z,nx,ny,nz,tx,ty,tz,length;unsigned char gone;} Hair;
+typedef struct {float x,y,z,nx,ny,nz,tx,ty,tz,length,u,v;unsigned char gone;} Hair;
+typedef struct {unsigned int color;float x,y,z;} GlossVertex;
 typedef struct {float x,y,vx,vy;unsigned char age,life,kind;} ShavingParticle;
 
 static TexturedVertex __attribute__((aligned(16))) head[MAX_HEAD_VERTS];
@@ -64,6 +66,11 @@ static UiVertex __attribute__((aligned(16))) bg[BG_QUADS*2];
 static int n_bg=0;
 static Hair hairs[HAIRS];
 static int n_hairs=0, removed=0, score=0;
+/* Base skin is preserved for instant reset. The coverage map only changes
+   where real hair has been removed, so eyes/nose/mouth remain unchanged. */
+static unsigned short __attribute__((aligned(16))) unshaved_skin[SKIN_TEXELS];
+static unsigned char shaved_coverage[SKIN_TEXELS];
+static int scalp_tex_dirty=0;
 static int phase=0,frame=0, play_frames=0;
 static float yaw=0.0f,pitch=0.0f,cursor_x=240.0f,cursor_y=128.0f;
 static unsigned int prev_buttons=0;
@@ -135,7 +142,43 @@ static float wrap01dist(float a,float b){float d=fabsf(a-b);return d<(1.0f-d)?d:
    The PSP keeps it at 128x128 to stay cache-friendly and lightweight. */
 
 #include "bald_head_v2.h"
-static void make_textures(void){bb_make_skin();}
+static void make_textures(void){
+  bb_make_skin();
+  memcpy(unshaved_skin,skin_tex,sizeof(skin_tex));
+  memset(shaved_coverage,0,sizeof(shaved_coverage));
+  scalp_tex_dirty=0;
+}
+static void reset_scalp_finish(void){
+  memcpy(skin_tex,unshaved_skin,sizeof(skin_tex));
+  memset(shaved_coverage,0,sizeof(shaved_coverage));
+  scalp_tex_dirty=1;
+}
+/* Blend a restrained peach/pink clean-shave tone into an atlas-local ellipse.
+   A saved copy of the original texture prevents cumulative overbrightening. */
+static void polish_shaved_patch(const Hair *h){
+  int cx=CLAMP((int)(h->u*(255.0f/127.0f)+.5f),0,255);
+  int cy=CLAMP((int)(h->v*(255.0f/127.0f)+.5f),0,255);
+  int xmin=CLAMP(cx-10,0,255),xmax=CLAMP(cx+10,0,255);
+  int ymin=CLAMP(cy-9,0,255),ymax=CLAMP(cy+9,0,255);
+  for(int y=ymin;y<=ymax;y++)for(int x=xmin;x<=xmax;x++){
+    float dx=(x-cx)/10.0f,dy=(y-cy)/9.0f;
+    float d=dx*dx+dy*dy;
+    if(d>=1.0f)continue;
+    int idx=y*256+x;
+    int ink=(int)(43.0f*(1.0f-d)*(1.0f-d))+4;
+    int coverage=CLAMP((int)shaved_coverage[idx]+ink,0,255);
+    shaved_coverage[idx]=(unsigned char)coverage;
+    float mix=.30f*(coverage/255.0f);
+    unsigned short b=unshaved_skin[idx];
+    float r=(b&31)*(255.0f/31.0f);
+    float g=((b>>5)&63)*(255.0f/63.0f);
+    float bl=((b>>11)&31)*(255.0f/31.0f);
+    skin_tex[idx]=bb_rgb565((int)(r*(1-mix)+248.0f*mix),
+                            (int)(g*(1-mix)+214.0f*mix),
+                            (int)(bl*(1-mix)+185.0f*mix));
+  }
+  scalp_tex_dirty=1;
+}
 
 static void add_tri(TexturedVertex a,TexturedVertex b,TexturedVertex c){if(n_head+3>MAX_HEAD_VERTS)return;head[n_head++]=a;head[n_head++]=b;head[n_head++]=c;}
 
@@ -228,6 +271,8 @@ static void make_hairs(void){
     normalize(&nx,&ny,&nz);
     Hair *h=&hairs[n_hairs++];
     h->x=x;h->y=y;h->z=z;h->nx=nx;h->ny=ny;h->nz=nz;
+    h->u=wa*a->u+wb*b->u+wc*c->u;
+    h->v=wa*a->v+wb*b->v+wc*c->v;
     h->tx=nz;h->ty=0;h->tz=-nx;
     normalize(&h->tx,&h->ty,&h->tz);
     h->length=.022f+.028f*rand01();h->gone=0;
@@ -566,6 +611,47 @@ static void draw_ui(void){
 
 
 
+/* Camera-dependent light reflection: glint moves over the freshly shaved
+   crown when the head rotates. The face UV texture remains untouched. */
+static void draw_shaved_scalp_gloss(void){
+  if(removed==0)return;
+  const float cy=cosf(yaw),sy=sinf(yaw);
+  const float cp=cosf(pitch),sp=sinf(pitch);
+  GlossVertex *buf=(GlossVertex*)sceGuGetMemory((size_t)n_head*sizeof(GlossVertex));
+  int count=0;
+  for(int i=0;i+2<n_head;i+=3){
+    if(head[i].y<.42f||head[i+1].y<.42f||head[i+2].y<.42f)continue;
+    for(int j=0;j<3;j++){
+      const TexturedVertex *h=&head[i+j];
+      int tx=CLAMP((int)(h->u*(255.0f/127.0f)+.5f),0,255);
+      int ty=CLAMP((int)(h->v*(255.0f/127.0f)+.5f),0,255);
+      float shaved=shaved_coverage[ty*256+tx]/255.0f;
+      float nz=h->ny*sp+h->nz*cp;
+      float nx=h->nx*cy+nz*sy;
+      float ny=h->ny*cp-h->nz*sp;
+      float zz=nz*cy-h->nx*sy;
+      /* Studio-style specular half-vector: upper-left key / camera. */
+      float dot=CLAMP(nx*(-.24f)+ny*.57f+zz*.79f,0.0f,1.0f);
+      float highlight=powf(dot,16.0f);
+      int alpha=CLAMP((int)(shaved*highlight*76.0f),0,76);
+      unsigned color=((unsigned)alpha<<24)|(218u<<16)|(241u<<8)|255u;
+      buf[count++]=(GlossVertex){color,
+        h->x+h->nx*.009f,
+        h->y+h->ny*.009f,
+        h->z+h->nz*.009f};
+    }
+  }
+  if(count==0)return;
+  sceGuDisable(GU_LIGHTING);
+  sceGuDisable(GU_TEXTURE_2D);
+  sceGuEnable(GU_BLEND);
+  sceGuBlendFunc(GU_ADD,GU_SRC_ALPHA,GU_ONE_MINUS_SRC_ALPHA,0,0);
+  sceGuDepthMask(GU_TRUE);
+  sceGumDrawArray(GU_TRIANGLES,
+      GU_COLOR_8888|GU_VERTEX_32BITF|GU_TRANSFORM_3D,count,0,buf);
+  sceGuDepthMask(GU_FALSE);
+  sceGuDisable(GU_BLEND);
+}
 static void render_head(void){
   sceGumMatrixMode(GU_PROJECTION);sceGumLoadIdentity();
   sceGumPerspective(47.0f,(float)SW/SH,0.1f,20.0f);
@@ -606,6 +692,7 @@ static void render_head(void){
   sceGumDrawArray(GU_TRIANGLES,
     GU_TEXTURE_32BITF|GU_NORMAL_32BITF|GU_VERTEX_32BITF|GU_TRANSFORM_3D,
     n_head,0,head);
+  draw_shaved_scalp_gloss();
   sceGuEnable(GU_LIGHTING);
   draw_beard_stubble();
   /* Ear details, neck and shirt are fitted to the new head silhouette. */
@@ -625,6 +712,7 @@ static void reset_game(void){
   removed=0;score=0;play_frames=0;cursor_x=240;cursor_y=130;
   yaw=0;pitch=0;shave_flash=0;phase=1;paused=0;pause_choice=0;
   cleanup_bonus_given=0;cleanup_bonus_flash=0;
+  reset_scalp_finish();
   memset(shavings,0,sizeof(shavings));shaving_fx_index=0;
   clean_sweep_flash=0;clean_sweep_hits=0;clean_sweep_frame=-100;
   last_shave_valid=0;cut_audio_pulse=0;
@@ -636,6 +724,7 @@ static void return_to_title(void){
   for(int i=0;i<n_hairs;i++)hairs[i].gone=0;
   removed=0;score=0;play_frames=0;cursor_x=240;cursor_y=130;
   yaw=0;pitch=0;shave_flash=0;phase=0;paused=0;pause_choice=0;
+  reset_scalp_finish();
   memset(shavings,0,sizeof(shavings));shaving_fx_index=0;
   clean_sweep_flash=0;clean_sweep_hits=0;clean_sweep_frame=-100;
   last_shave_valid=0;cut_audio_pulse=0;
@@ -666,6 +755,7 @@ static void shave_at_cursor(void){
     float ex=px+t*vx,ey=py+t*vy;
     if(ex*ex+ey*ey<1.0f){
       h->gone=1;removed++;score+=20;hit++;
+      polish_shaved_patch(h);
       if(hit<=8)spawn_shavings(sx,sy,hit<3?2:1);
     }
   }
@@ -705,6 +795,7 @@ static void locate_final_hair(void){
     cursor_y=CLAMP(sy,60.0f,207.0f);
   }else{
     h->gone=1;removed++;score+=20;shave_flash=7;
+    polish_shaved_patch(h);
     if(removed>=n_hairs){
       phase=2;clipper_active=0;win_voice_pending=1;
     }
@@ -886,6 +977,12 @@ static void init_graphics(void){
  sceDisplayWaitVblankStart();sceGuDisplay(GU_TRUE);
 }
 static void draw_frame(void){
+ /* Dirty PSP CPU cache must be written back before the GPU reads skin_tex.
+    sceGuTexImage in render_head also flushes the GPU texture page cache. */
+ if(scalp_tex_dirty){
+   sceKernelDcacheWritebackRange(skin_tex,sizeof(skin_tex));
+   scalp_tex_dirty=0;
+ }
  sceGuStart(GU_DIRECT,gu_list);
  sceGuClearColor(C(13,26,42));sceGuClearDepth(0);
  sceGuClear(GU_COLOR_BUFFER_BIT|GU_DEPTH_BUFFER_BIT);
