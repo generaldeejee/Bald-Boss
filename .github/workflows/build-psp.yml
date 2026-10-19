@@ -16,6 +16,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
       - name: Install free audio-generation dependencies
         run: |
           sudo apt-get update -qq
@@ -26,6 +29,8 @@ jobs:
         with:
           path: .cache/piper
           key: piper-en-us-john-medium-789c6c875726
+      - name: Test singing pitch and voice ducking
+        run: python3 tools/test_melodic_voice.py
       - name: Generate announcer and melodic rock soundtrack
         run: |
           python3 tools/generate_voice.py
