@@ -1,4 +1,4 @@
-/* Bald Boss 3D - PSP Edition v0.9.2 natural victory announcer new anatomical head, UV texture and crown pitch controls barber UI, restart and finish camera with Deep Voice soundtrack. Original homebrew source.
+/* Bald Boss 3D - PSP Edition v0.9.3 consistent Elite Bald Man Club naming new anatomical head, UV texture and crown pitch controls barber UI, restart and finish camera with Deep Voice soundtrack. Original homebrew source.
    Uses PSPSDK GU/GUM hardware 3D renderer. No PS1 BIOS calls. */
 #include <pspkernel.h>
 #include <pspctrl.h>
@@ -503,7 +503,7 @@ static void draw_tutorial(void){
  ui_box(45,49,390,168,C(7,14,23));
  ui_box(49,53,382,160,C(25,39,53));
  ui_box(49,53,382,4,C(193,155,80));
- ui_text(141,64,"ELITE BALD CLUB HANDBOOK",1.24f);
+ ui_text(141,64,"CLUB BARBER HANDBOOK",1.24f);
  ui_text(75,91,"D-PAD / ANALOG  MOVE CLIPPERS",1.0f);
  ui_text(75,105,"HOLD X / SQUARE  SHAVE HAIR",1.0f);
  ui_text(75,119,"L / R  ROTATE THE HEAD",1.0f);
@@ -522,8 +522,8 @@ static void draw_ui(void){
   ui_box(0,220,SW,52,C(10,17,26));
   ui_box(0,269,SW,3,C(57,126,139));
   ui_box(9,7,5,29,C(193,155,80));
-  ui_text(19,9,"BALD BOSS",1.95f);
-  ui_text(180,12,phase==0?"ELITE BALD CLUB":"CLUB INITIATION",1.00f);
+  ui_text(19,9,"BALD BOSS 3D",1.95f);
+  ui_text(180,12,phase==0?"THE ELITE BALD MAN CLUB":"CLUB INITIATION",1.00f);
   ui_text(419,8,music_enabled?"MUSIC":"MUTED",.93f);
   if(phase!=0){
     int finishing=phase==1 && n_hairs-removed>0 && n_hairs-removed<=12 && !finish_zoom_override;
@@ -534,11 +534,11 @@ static void draw_ui(void){
   if(phase==0){
     ui_box(236,61,231,151,C(10,18,28));
     ui_box(236,61,3,151,C(193,155,80));
-    ui_text(268,66,"BOSS BARBERS",1.28f);
+    ui_text(268,66,"CLUB BARBER\'S CHAIR",1.12f);
     ui_text(249,85,"THE ELITE BALD MAN CLUB",1.06f);
     ui_text(250,102,"ONLY TRULY BALD MEN MAY JOIN.",.92f);
-    ui_text(250,114,"SHAVE THESE HEADS. TURN THEM",.92f);
-    ui_text(250,126,"INTO BALD BOSSES!",.99f);
+    ui_text(250,114,"SHAVE THE APPLICANTS. TURN",.92f);
+    ui_text(250,126,"THEM INTO BALD BOSSES!",.99f);
     ui_box(247,143,210,21,title_mode==0?C(58,77,92):C(21,32,44));
     ui_box(247,166,210,21,title_mode==1?C(58,77,92):C(21,32,44));
     ui_box(247,title_mode==0?143:166,4,21,C(239,192,96));
