@@ -1,4 +1,4 @@
-# Bald Boss 3D — PSP Edition v0.9.4 (public beta candidate)
+# Bald Boss 3D — PSP Edition v0.9.5 (public beta candidate)
 
 **Bald Boss 3D** is an original, humorous, native PlayStation Portable (PSP) homebrew game. You play the **Club Barber**: shave a rotating 3D head with an electric clipper and help applicants earn the title **Bald Boss**.
 
@@ -23,11 +23,12 @@ In the title screen, the barber's workspace is called **Club Barber's Chair**, n
 
 Built in C with the open-source PSPDEV/PSPSDK toolchain and PSP GU/GUM rendering. It is **not** a PS1 executable and needs **no PS1 BIOS**.
 
-## What's new in v0.9.4
+## What's new in v0.9.5
 
-- **Expressive menu song (v0.9.4):** the title/results song **“No Hair, No Fear!”** now regenerates its original verses and chorus as a more naturally inflected deep male **spoken-rock performance**, using the same Piper John voice as the victory announcer. Different delivery styles for the verse/chorus, light stadium reverb, phrasing variation, and no artificial deep-speed trick. The original 80s guitar/synth/drum backing and game-mode instrumental are preserved. It is NOT real human singing or pitch-accurate synthesized singing; it remains an AI-generated rhythmic spoken chant.
-- **Build verification:** the music generator downloads and verifies the voice model using `tools/generate_voice.py` and GitHub Actions confirms the generated PCM8 music header contains `BALD_BOSS_MUSIC_VOCALS_PIPER 1`. Piper runs only on the build machine, not on PSP.
-
+- **Melodic menu singing (v0.9.5):** **"No Hair, No Fear!"** now has a *composed E-minor melodic lead* instead of monotone spoken-rock narration. Piper's neural male voice is re-pitched note by note with [Praat/Parselmouth](https://parselmouth.readthedocs.io/) TD-PSOLA so voiced syllables carry musical notes, natural-speed consonants and subtle vibrato. This is **synthetic singing**, not a recording of a professional human rock singer, and still has that limitation.
+- **Lyrics easy to hear:** a vocal-forward mix boosts the sung lead and smoothly ducks the guitars, drums and synthesizer by up to roughly 9 dB while the singer is active. That ducking is **only on the title and results song**; the standalone instrumental during the shaving challenge is unchanged.
+- **Build-time dependencies:** includes `praat-parselmouth==0.4.7` and `piper-tts==1.3.0` in the GitHub Actions music-generation job. No new PSP runtime modules are required; both soundtracks are still compact 11.025 kHz PCM8.
+- **v0.9.4:** improved the previous spoken-rock vocals with more natural Piper delivery before adding melody.
 
 - **Consistent theme (v0.9.3):** game title *Bald Boss 3D*, club *The Elite Bald Man Club*, player *Club Barber*, accepted member *Bald Boss*. Replaced the confusing *Boss Barbers* and *Elite Bald Club* aliases across the in-game menus. Win voice and music remain unchanged.
 
@@ -92,7 +93,7 @@ The GitHub workflow [Build PSP EBOOT](https://github.com/generaldeejee/Bald-Boss
 For a local PSPSDK installation, install the free **piper-tts==1.3.0** build-time package along with NumPy and SciPy. The speech model is about 63.5 MB and is cached only on the build computer:
 
 ```sh
-python3 -m pip install numpy scipy soundfile piper-tts==1.3.0
+python3 -m pip install numpy scipy soundfile piper-tts==1.3.0 praat-parselmouth==0.4.7
 ```
 
 The Piper model is downloaded and SHA-256-verified automatically by the announcer generator. If model download fails, the normal build stops rather than silently substituting robotic speech.
@@ -131,7 +132,7 @@ Before publishing a download on a homebrew site, verify:
 - [ ] Take genuine in-game screenshots and include them in a GitHub Release.
 - [ ] Publish a ZIP containing `PSP/GAME/BALDBOSS/EBOOT.PBP` with version, changelog and license.
 
-**Verification status:** Source-level integration checks have been performed for v0.9.4. The re-generated neural rock vocals, sound quality and PSP build still require confirmation from GitHub Actions and listening tests. The Piper neural voice generator and changed PSP sample rate still need confirmation from the GitHub Actions build and a PPSSPP listening test. A successful PSPDEV cross-compilation, PPSSPP playthrough of v0.9.0 and physical PSP testing still need confirmation. Do not label this build “fully tested on PSP” until it has been verified.
+**Verification status:** Source-level checks and a local TD-PSOLA melody-conversion smoke test have been performed for v0.9.5. The complete song generated with Piper, audibility in the PSP mono mix, and the PSPDEV/PPSSPP build still require verification. Do not advertise this edition as studio-quality recorded rock singing. The Piper neural voice generator and changed PSP sample rate still need confirmation from the GitHub Actions build and a PPSSPP listening test. A successful PSPDEV cross-compilation, PPSSPP playthrough of v0.9.0 and physical PSP testing still need confirmation. Do not label this build “fully tested on PSP” until it has been verified.
 
 ## Reporting issues
 
