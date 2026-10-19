@@ -1,4 +1,4 @@
-/* Bald Boss 3D - PSP Edition v0.3 (centered face, original music, detailed face). Original homebrew source.
+/* Bald Boss 3D - PSP Edition v0.4 (integrated low-poly head, face texture and finer stubble). Original homebrew source.
    Uses PSPSDK GU/GUM hardware 3D renderer. No PS1 BIOS calls. */
 #include <pspkernel.h>
 #include <pspctrl.h>
