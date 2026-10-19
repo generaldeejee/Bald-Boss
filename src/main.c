@@ -1,4 +1,4 @@
-/* Bald Boss 3D - PSP Edition v0.9.4 expressive natural rock vocals new anatomical head, UV texture and crown pitch controls barber UI, restart and finish camera with Deep Voice soundtrack. Original homebrew source.
+/* Bald Boss 3D - PSP Edition v0.9.5 melodic rock vocals and foreground mix new anatomical head, UV texture and crown pitch controls barber UI, restart and finish camera with Deep Voice soundtrack. Original homebrew source.
    Uses PSPSDK GU/GUM hardware 3D renderer. No PS1 BIOS calls. */
 #include <pspkernel.h>
 #include <pspctrl.h>
