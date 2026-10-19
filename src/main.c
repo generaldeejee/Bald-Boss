@@ -1,4 +1,4 @@
-/* Bald Boss 3D - PSP Edition v0.5 (recessed eyes, restored face, intro, safe layout). Original homebrew source.
+/* Bald Boss 3D - PSP Edition v0.5.1 (font readability fix, recessed eyes, intro). Original homebrew source.
    Uses PSPSDK GU/GUM hardware 3D renderer. No PS1 BIOS calls. */
 #include <pspkernel.h>
 #include <pspctrl.h>
@@ -328,6 +328,9 @@ static void ui_box(int x,int y,int w,int h,unsigned int color){
    This implementation reuses the UI primitive path already proven in PPSSPP.
    Consecutive vertical pixels are merged into a single rectangle. */
 static void ui_text(float x,float y,const char *s,float scale){
+ /* Prevent subpixel 5x7 columns from rounding to zero width.
+    For example the L in ONLY loses its left stroke at scale 0.90. */
+ if(scale<1.0f)scale=1.0f;
  const unsigned int ink=C(241,244,238);
  while(*s){
    unsigned char c=(unsigned char)*s++;
