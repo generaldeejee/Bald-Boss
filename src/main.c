@@ -1,4 +1,4 @@
-/* Bald Boss 3D - PSP Edition v0.8.2 smooth shaved scalp and specular light new anatomical head, UV texture and crown pitch controls barber UI, restart and finish camera with Deep Voice soundtrack. Original homebrew source.
+/* Bald Boss 3D - PSP Edition v0.9.0 Zen Mode, victory results and tutorial new anatomical head, UV texture and crown pitch controls barber UI, restart and finish camera with Deep Voice soundtrack. Original homebrew source.
    Uses PSPSDK GU/GUM hardware 3D renderer. No PS1 BIOS calls. */
 #include <pspkernel.h>
 #include <pspctrl.h>
@@ -72,6 +72,9 @@ static unsigned short __attribute__((aligned(16))) unshaved_skin[SKIN_TEXELS];
 static unsigned char shaved_coverage[SKIN_TEXELS];
 static int scalp_tex_dirty=0;
 static int phase=0,frame=0, play_frames=0;
+static int title_mode=0,zen_mode=0; /* 0 Challenge / 1 Zen */
+static int tutorial_open=0,tutorial_seen=0;
+static int victory_frames=0;
 static float yaw=0.0f,pitch=0.0f,cursor_x=240.0f,cursor_y=128.0f;
 static unsigned int prev_buttons=0;
 static unsigned int rand_seed=0xB01D2026u;
@@ -492,6 +495,24 @@ static void draw_shavings(void){
     ui_box(x+1,y+3,3,1,col);
   }
 }
+static int victory_stars(void){
+ if(zen_mode)return 3; /* Zen rewards completion, not speed */
+ return play_frames<=50*60?3:(play_frames<=75*60?2:1);
+}
+static void draw_tutorial(void){
+ ui_box(45,49,390,168,C(7,14,23));
+ ui_box(49,53,382,160,C(25,39,53));
+ ui_box(49,53,382,4,C(193,155,80));
+ ui_text(151,64,"WELCOME TO BALD BOSS",1.34f);
+ ui_text(75,91,"D-PAD / ANALOG  MOVE CLIPPERS",1.0f);
+ ui_text(75,105,"HOLD X / SQUARE  SHAVE HAIR",1.0f);
+ ui_text(75,119,"L / R  ROTATE THE HEAD",1.0f);
+ ui_text(75,133,"L + UP/DOWN  TILT FOR CROWN",1.0f);
+ ui_text(75,147,"CIRCLE  ZOOM IN OR OUT",1.0f);
+ ui_text(75,161,"TRIANGLE  FIND FINAL HAIRS",1.0f);
+ ui_text(75,175,"START  PAUSE AND MENU",1.0f);
+ ui_text(108,195,"X / CIRCLE  CONTINUE",1.08f);
+}
 static void draw_ui(void){
   n_hud=0;
   ui_box(0,0,SW,44,C(10,17,26));
@@ -511,19 +532,20 @@ static void draw_ui(void){
   }
 
   if(phase==0){
-    /* A dedicated intro panel sits beside the smaller rotating portrait. */
     ui_box(236,61,231,151,C(10,18,28));
     ui_box(236,61,3,151,C(193,155,80));
     ui_text(268,66,"BOSS BARBERS",1.28f);
     ui_text(251,88,"THE BALD BOSS CREED",1.10f);
-    ui_text(252,113,"BALD MEN ARE THE",1.04f);
-    ui_text(252,129,"TOUGHEST ON EARTH.",1.04f);
-    ui_text(252,147,"ONLY TRUE BALD BOSSES",.90f);
-    ui_text(252,160,"WELCOME HERE.",.90f);
-    ui_text(262,181,"PRESS X TO START",1.22f);
-    ui_text(278,195,"THE CHAIR AWAITS",0.92f);
+    ui_text(252,111,"BALD MEN ARE THE",1.04f);
+    ui_text(252,124,"TOUGHEST ON EARTH.",1.04f);
+    ui_box(247,143,210,21,title_mode==0?C(58,77,92):C(21,32,44));
+    ui_box(247,166,210,21,title_mode==1?C(58,77,92):C(21,32,44));
+    ui_box(247,title_mode==0?143:166,4,21,C(239,192,96));
+    ui_text(257,149,"90 SEC CHALLENGE",1.08f);
+    ui_text(257,172,"ZEN MODE NO TIMER",1.08f);
+    ui_text(256,196,"UP/DOWN  X START",.96f);
     ui_text(18,227,"NO WIGS. NO FEAR. JUST BALDNESS.",1.02f);
-    ui_text(19,253,"L+UP/DOWN TILT  L/R TURN  X START",.95f);
+    ui_text(19,253,"UP/DOWN MODE  TRI CONTROLS  X START",.95f);
   } else {
     ui_box(9,227,129,36,C(17,30,42));
     ui_box(146,227,143,36,C(17,30,42));
@@ -539,8 +561,9 @@ static void draw_ui(void){
     ui_text(153,225,"SCORE",1.05f);
     snprintf(buf,sizeof(buf),"%d",score);
     ui_text(153,246,buf,1.45f);
-    ui_text(306,225,"TIME",1.05f);
-    int seconds=90-play_frames/60;if(seconds<0)seconds=0;
+    ui_text(306,225,zen_mode?"ZEN TIME":"TIME",1.05f);
+    int seconds=zen_mode?play_frames/60:90-play_frames/60;
+    if(seconds<0)seconds=0;
     snprintf(buf,sizeof(buf),"%02d:%02d",seconds/60,seconds%60);
     ui_text(306,246,buf,1.45f);
     snprintf(buf,sizeof(buf),"LEFT %d",n_hairs-removed);
@@ -557,8 +580,15 @@ static void draw_ui(void){
       ui_text(268,199,"EXTRA 30 SECONDS!",1.0f);
     }
     if(phase==2){
-      ui_box(104,168,272,42,C(10,16,27));
-      ui_text(158,181,"MASTER BARBER!",1.65f);
+      ui_box(70,158,340,54,C(10,17,27));
+      ui_box(70,158,340,3,C(193,155,80));
+      ui_text(130,164,"ANOTHER BALD BOSS!",1.40f);
+      int stars=victory_stars();
+      for(int i=0;i<3;i++)ui_text(204+i*24,180,i<stars?"*":"-",1.75f);
+      char result[48];
+      if(zen_mode)snprintf(result,sizeof(result),"ZEN COMPLETE  SCORE %d",score);
+      else snprintf(result,sizeof(result),"SCORE %d  TIME %02d:%02d",score,play_frames/3600,(play_frames/60)%60);
+      ui_text(108,198,result,1.05f);
     }else if(phase==3){
       ui_box(104,168,272,42,C(10,16,27));
       ui_text(168,181,"TIME IS UP!",1.65f);
@@ -582,26 +612,27 @@ static void draw_ui(void){
       ui_box(cx-1,cy+5,2,9,C(255,221,135));
     }
     if(paused){
-      ui_box(103,60,274,156,C(8,14,22));
-      ui_box(106,63,268,150,C(26,37,48));
-      ui_box(109,66,262,25,C(14,28,40));
-      ui_box(109,66,262,3,C(196,160,91));
-      ui_text(207,75,"PAUSED",1.55f);
-      ui_text(125,95,"CHOOSE YOUR NEXT MOVE",1.00f);
-      for(int i=0;i<3;i++){
-        int top=117+i*24;
-        ui_box(125,top,230,20,pause_choice==i?C(58,77,92):C(16,25,35));
+      ui_box(103,51,274,165,C(8,14,22));
+      ui_box(106,54,268,159,C(26,37,48));
+      ui_box(109,57,262,24,C(14,28,40));
+      ui_box(109,57,262,3,C(196,160,91));
+      ui_text(207,66,"PAUSED",1.55f);
+      for(int i=0;i<4;i++){
+        int top=87+i*26;
+        ui_box(125,top,230,23,pause_choice==i?C(58,77,92):C(16,25,35));
         if(pause_choice==i){
-          ui_box(125,top,4,20,C(239,192,96));
-          ui_text(137,top+5,">",1.0f);
+          ui_box(125,top,4,23,C(239,192,96));
+          ui_text(137,top+7,">",1.0f);
         }
       }
-      ui_text(188,122,"RESUME",1.20f);
-      ui_text(174,146,"RESTART RUN",1.20f);
-      ui_text(160,170,"RETURN TO TITLE",1.20f);
+      ui_text(185,94,"RESUME",1.20f);
+      ui_text(172,120,"RESTART RUN",1.20f);
+      ui_text(158,146,"RETURN TO TITLE",1.20f);
+      ui_text(171,172,"HOW TO PLAY",1.20f);
       ui_text(132,199,"UP/DOWN  X SELECT  O BACK",1.0f);
     }
   }
+  if(tutorial_open)draw_tutorial();
   /* PSP 2D sprite font: proven in PPSSPP, no problematic texture UVs. */
   sceKernelDcacheWritebackAll();
   sceGuDisable(GU_LIGHTING);sceGuDisable(GU_DEPTH_TEST);
@@ -715,6 +746,8 @@ static void reset_game(void){
   for(int i=0;i<n_hairs;i++)hairs[i].gone=0;
   removed=0;score=0;play_frames=0;cursor_x=240;cursor_y=130;
   yaw=0;pitch=0;shave_flash=0;phase=1;paused=0;pause_choice=0;
+  zen_mode=title_mode;victory_frames=0;
+  tutorial_open=!tutorial_seen;tutorial_seen=1;
   cleanup_bonus_given=0;cleanup_bonus_flash=0;
   reset_scalp_finish();
   memset(shavings,0,sizeof(shavings));shaving_fx_index=0;
@@ -728,6 +761,7 @@ static void return_to_title(void){
   for(int i=0;i<n_hairs;i++)hairs[i].gone=0;
   removed=0;score=0;play_frames=0;cursor_x=240;cursor_y=130;
   yaw=0;pitch=0;shave_flash=0;phase=0;paused=0;pause_choice=0;
+  tutorial_open=0;victory_frames=0;
   reset_scalp_finish();
   memset(shavings,0,sizeof(shavings));shaving_fx_index=0;
   clean_sweep_flash=0;clean_sweep_hits=0;clean_sweep_frame=-100;
@@ -772,13 +806,13 @@ static void shave_at_cursor(void){
     clean_sweep_hits=CLAMP(clean_sweep_hits+hit,0,999);
     clean_sweep_flash=24;
   }
-  if(!cleanup_bonus_given && n_hairs-removed<=10 && n_hairs-removed>0){
+  if(!zen_mode && !cleanup_bonus_given && n_hairs-removed<=10 && n_hairs-removed>0){
     cleanup_bonus_given=1;
     play_frames=play_frames>30*60?play_frames-30*60:0;
     cleanup_bonus_flash=150;
   }
   if(removed>=n_hairs && n_hairs>0 && phase==1){
-    phase=2;clipper_active=0;win_voice_pending=1;
+    phase=2;clipper_active=0;win_voice_pending=1;victory_frames=0;
   }
 }/* Final-hair locator: orient the head to a remaining strand and aim the
    clippers at it. Off-screen inaccessible hairs are automatically cleared. */
@@ -801,7 +835,7 @@ static void locate_final_hair(void){
     h->gone=1;removed++;score+=20;shave_flash=7;
     polish_shaved_patch(h);
     if(removed>=n_hairs){
-      phase=2;clipper_active=0;win_voice_pending=1;
+      phase=2;clipper_active=0;win_voice_pending=1;victory_frames=0;
     }
   }
 }
@@ -809,11 +843,27 @@ static void update(void){
  SceCtrlData pad;
  sceCtrlPeekBufferPositive(&pad,1);
  unsigned int b=pad.Buttons, just=b&~prev_buttons; prev_buttons=b;
+ if(tutorial_open){
+   clipper_active=0;last_shave_valid=0;
+   if(just&(PSP_CTRL_CROSS|PSP_CTRL_CIRCLE|PSP_CTRL_TRIANGLE))tutorial_open=0;
+   return; /* Tutorial does not consume game time or accidentally shave. */
+ }
  if(just&PSP_CTRL_SELECT)music_enabled=!music_enabled;
  if(phase!=1){
    clipper_active=0;
-   if(just&PSP_CTRL_CROSS)reset_game();
-   else if(phase==0)yaw=0.10f*sinf((float)frame*0.010f);
+   if(phase==0){
+     if(just&(PSP_CTRL_UP|PSP_CTRL_DOWN))title_mode^=1;
+     if(just&PSP_CTRL_TRIANGLE){tutorial_open=1;return;}
+     if(just&PSP_CTRL_CROSS){reset_game();return;}
+     yaw=0.10f*sinf((float)frame*0.010f);
+   }else{
+     if(just&PSP_CTRL_CROSS){reset_game();return;}
+     if(phase==2){
+       victory_frames++;
+       yaw+=.012f;if(yaw>=2*PI)yaw-=2*PI;
+       pitch=.12f+.12f*sinf(victory_frames*.028f);
+     }
+   }
    return;
  }
  if(just&PSP_CTRL_START){
@@ -822,13 +872,14 @@ static void update(void){
  }
  if(paused){
    clipper_active=0;
-   if(just&PSP_CTRL_UP)pause_choice=(pause_choice+2)%3;
-   if(just&PSP_CTRL_DOWN)pause_choice=(pause_choice+1)%3;
+   if(just&PSP_CTRL_UP)pause_choice=(pause_choice+3)%4;
+   if(just&PSP_CTRL_DOWN)pause_choice=(pause_choice+1)%4;
    if(just&PSP_CTRL_CIRCLE){paused=0;return;}
    if(just&PSP_CTRL_CROSS){
      if(pause_choice==0){paused=0;return;}
      if(pause_choice==1){reset_game();return;}
      if(pause_choice==2){return_to_title();return;}
+     if(pause_choice==3){tutorial_open=1;return;}
    }
    return;
  }
@@ -867,8 +918,10 @@ static void update(void){
  update_shavings();
  if(shave_flash)shave_flash--;
  if(cleanup_bonus_flash>0)cleanup_bonus_flash--;
- if(n_hairs-removed>1)play_frames++; /* One last hair: unlimited cleanup time. */
- if(play_frames>=90*60 && phase==1 && n_hairs-removed>1){phase=3;clipper_active=0;}
+ if(zen_mode||n_hairs-removed>1)play_frames++;
+ if(!zen_mode && play_frames>=90*60 && phase==1 && n_hairs-removed>1){
+   phase=3;clipper_active=0;
+ }
 }
 
 /* Deep Voice Edition soundtrack.
