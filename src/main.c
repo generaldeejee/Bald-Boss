@@ -523,7 +523,7 @@ static void draw_ui(void){
   ui_box(0,269,SW,3,C(57,126,139));
   ui_box(9,7,5,29,C(193,155,80));
   ui_text(19,9,"BALD BOSS 3D",1.95f);
-  ui_text(180,12,phase==0?"THE ELITE BALD MAN CLUB":"CLUB INITIATION",1.00f);
+  ui_text(195,12,phase==0?"THE ELITE BALD MAN CLUB":"CLUB INITIATION",1.00f);
   ui_text(419,8,music_enabled?"MUSIC":"MUTED",.93f);
   if(phase!=0){
     int finishing=phase==1 && n_hairs-removed>0 && n_hairs-removed<=12 && !finish_zoom_override;
