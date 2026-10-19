@@ -1,148 +1,102 @@
-# BALD BOSS 3D — PSP Edition (source prototype v0.1)
+# Bald Boss 3D — PSP Edition v0.9.0 (public beta candidate)
 
-A native PlayStation Portable homebrew rewrite of the PS1 Bald Boss 3D mini-game.
-**This is PSP C source for PSPSDK/libGU, not a PS1 EXE or a Windows program.**
+**Bald Boss 3D** is an original, humorous, native PlayStation Portable (PSP) homebrew game: shave a rotating 3D head with an electric clipper, uncover the shiny scalp, and become a legendary Bald Boss.
 
-## Improvements over the PS1 game
+Built in C with the open-source PSPDEV/PSPSDK toolchain and PSP GU/GUM rendering. It is **not** a PS1 executable and needs **no PS1 BIOS**.
 
-- **480 × 272** widescreen output, genuine PSP GU/GUM perspective 3D graphics
-- Smooth lighting, textured skin, rounded ears, nose, lips, and 3D sunglasses
-- 28 × 44 segments / 2,464 triangles for the head alone (much smoother than PS1)
-- Up to 1,250 seeded scalp hairs/tufts (some skipped for receding temples), each independently removable
-- Real hardware depth buffer so back-facing/hidden features do not draw through the head
-- Smooth 360-degree rotation; head, hairs and facial features rotate together
-- 90-second shave challenge, percentage, score, victory/game-over screen
-- Original PSP homebrew menu icon, analog controls and safe-area HUD
+## What's new in v0.9.0
 
-This is original replacement rendering/game code, **not** the PS1 MIPS EXE run through PSP's backwards compatibility.
+- **90 Seconds Challenge:** the classic timed shave, with a 30-second cleanup bonus near the end and protection against losing to one inaccessible final hair.
+- **Zen Mode:** the same shaving, hair particles, sound effects and free rotation, but without a time limit. The clock tracks elapsed time.
+- **Victory celebration:** an automatic slow 360° head orbit to showcase your freshly polished scalp, a score, a one-to-three-star rating and the original **“Another bald boss!”** announcer.
+- **In-game tutorial:** displayed on the first round; also accessible from the title screen with **Triangle**, or from **Pause → How to Play**.
+- Preserves the procedurally modeled 3D head, 256×256 textured skin, hair-finding help, dynamic scalp gloss, zoom, vertical head tilt and the original Deep Voice Edition soundtrack.
 
-## Gameplay controls
+### Two ways to play
 
-| Button | Action |
+| Mode | Objective | Clock | Stars |
+| --- | --- | --- | --- |
+| 90 Seconds Challenge | Shave every strand before the timer expires | 90 seconds initially; a cleanup-time bonus near the end | 3 stars for finishing with a displayed time of 50 seconds or less elapsed, 2 for 75 seconds or less, otherwise 1 |
+| Zen Mode | Shave at your own pace | No time limit; elapsed time is displayed | 3 stars on completion (speed is not scored) |
+
+The last-hair locator and close-up assistance work in **both** modes.
+
+## PSP controls
+
+| Control | Action |
 | --- | --- |
-| **X** on title screen | Start game |
-| D-pad / analog stick | Move clippers |
-| **Hold X / Square** | Shave hair under the clippers |
-| L / R | Rotate head (360 degrees) |
-| X on results screen | New round |
-| HOME | Exit through PSP system menu |
+| **D-pad Up/Down** on title screen | Choose Challenge or Zen Mode |
+| **X** on title screen | Start the selected mode |
+| **Triangle** on title screen | Open controls tutorial |
+| **D-pad / analog stick** in-game | Move the clipper |
+| **Hold X or Square** | Shave the hair under the clipper; quick movement shaves across the travelled path |
+| **L / R** | Rotate the head left / right |
+| **Hold L + Up/Down** | Tilt the head to reveal the crown and the underside |
+| **Circle** | Switch camera zoom |
+| **Triangle** when ≤3 hairs remain | Aim the camera and clipper at a remaining hair |
+| **Select** | Toggle background music (clipper and voice remain audible) |
+| **Start** | Pause / open the pause menu |
+| **Up/Down, X** in pause menu | Choose Resume, Restart Run, Return to Title, or How to Play |
+| **Circle** in pause menu | Return to gameplay |
+| **X or Circle** in tutorial | Close tutorial |
+| **X** on victory / timeout | Play again in the currently selected mode |
+| **HOME** on physical PSP | System exit menu |
 
-## How to create a real `EBOOT.PBP`
+The game uses on-screen tracking markers to help you find the last hairs and stops the Challenge clock when only **one hair** remains.
 
-The binary is built with the open-source **PSPDEV / PSPSDK** toolchain:
-https://pspdev.github.io/
+## Installation and playing
 
-### Option A — GitHub Actions (no PSP compiler needed on your own PC)
+Download the compiled **EBOOT.PBP** from the [GitHub Actions build page](https://github.com/generaldeejee/Bald-Boss/actions) when the newest build has passed.
 
-1. Create a new GitHub repository and upload **everything** from this project directory, including `.github/workflows/build-psp.yml`.
-2. Open the repository's **Actions** tab.
-3. Select **Build PSP EBOOT**, then **Run workflow**.
-4. When the build finishes, download the `BaldBoss3D-PSP-EBOOT` artifact. Inside is `EBOOT.PBP`.
-5. Start PPSSPP, choose **Load…**, and open `EBOOT.PBP` (or install it under `PSP/GAME/BALDBOSS/EBOOT.PBP`).
+**PPSSPP emulator:** open **EBOOT.PBP** using *Load*.
 
-If you don't see workflows, enable Actions for the repository. GitHub Actions may have usage limits.
+**Physical PSP:** use a homebrew-capable PSP, create the folder `/PSP/GAME/BALDBOSS/` on the Memory Stick, and copy the file as `/PSP/GAME/BALDBOSS/EBOOT.PBP`. Launch it from the PSP Game menu.
 
-### Option B — Docker Desktop (Windows/Linux/macOS)
+A **GitHub Actions artifact is not a permanent public release**. For a public homebrew-site submission, attach a tested installation ZIP to a proper GitHub Release rather than directing users to a short-lived Actions artifact.
 
-From the project directory (PowerShell or terminal), with Docker running:
+## Building from source
 
-```bash
-docker run --rm -v "${PWD}:/src" -w /src pspdev/pspdev:latest make
-```
+The GitHub workflow [Build PSP EBOOT](https://github.com/generaldeejee/Bald-Boss/actions) generates its audio data and compiles the game. It is triggered automatically for relevant code/asset changes, or manually through *Run workflow*.
 
-On Windows CMD rather than PowerShell, replace `${PWD}` with `%cd%`.
-When successful, `EBOOT.PBP` appears in the project directory.
+For a local PSPSDK installation:
 
-### Option C — Existing PSPDEV installation (Linux/WSL/macOS)
-
-```bash
+```sh
+python3 tools/generate_voice.py
+python3 tools/generate_psp_music.py
 make
-# or:
-./build_linux.sh
 ```
 
-Do not double-click the `.c` file. Do not load PS1 `.EXE` binaries in PPSSPP. PSP games use `EBOOT.PBP`.
+The audio generators require their documented Python dependencies (NumPy, SciPy and SoundFile for the music workflow) and ffmpeg/eSpeak where used. You may alternatively follow `.github/workflows/build-psp.yml` for the exact dependencies and use the `pspdev/pspdev` toolchain container.
 
-## Technical notes and limitations
+The game renders at **480×272**, uses its own PSP GU/GUM renderer, and generates the head mesh and base face texture on startup.
 
-- The renderer uses the PSP's hardware Graphics Utility (`sceGu*` and `sceGum*`), with independent draw, display, and 16-bit depth buffers.
-- Hair is constructed procedurally and is independently tracked so it can be removed while preserving complete 360-degree rotation.
-- The hair model is **stylized realism**, not photorealistic scanned hair or a photorealistic face.
-- All assets are original and no Sony assets/BIOS/firmware are bundled.
-- **Important validation status:** The C source has passed a local GCC syntax check (using API header shims) and native host-side gameplay/geometry tests, but a PSPDEV cross-compile and a PPSSPP or real-hardware run have **NOT** been possible in the creation environment. There is **no prebuilt or verified EBOOT.PBP** in this ZIP. A successful GitHub Actions or Docker build is needed before the program can be played.
-- First hardware test should check texture visibility, head rotation, controller input, scalp visibility from all angles, and performance. Follow-up iterations may be needed.
+## Credits and licensing
 
-## Folder structure
+- **Source code:** MIT; see [LICENSE](LICENSE).
+- **Original 3D head and UV paint generator:** project-authored and marked CC0 in `src/bald_head_v2.h`.
+- **Soundtrack and voice:** original/AI-assisted procedural compositions and free eSpeak-derived voice recordings made with the repository's music and voice generators. The title/results use the Deep Voice track; gameplay uses its instrumental.
+- **Development:** project concept and coding work developed in collaboration with ChatGPT. This disclosure is useful when submitting to community homebrew indexes.
 
-```text
-Bald_Boss_3D_PSP/
-├── src/main.c                 # Full playable game source
-├── assets/ICON0.PNG           # 144×80 PSP menu icon
-├── Makefile                   # PSPSDK PSP binary + EBOOT build
-├── .github/workflows/build-psp.yml
-├── build_linux.sh             # Linux/WSL build
-├── build_windows_wsl.bat      # Windows WSL helper
-└── tools/
-    ├── syntax_check.py       # Host-only C syntax check
-    ├── test_model.c           # Geometry/shave gameplay regression tests
-    └── verify.sh
-```
+No copyrighted Sony game, BIOS or firmware files are distributed.
 
-## Credits
+## Beta release checklist
 
-Bald Boss 3D game concept and source generated in collaboration with ChatGPT. Original project started as a PS1 homebrew and is rewritten here for PSP. Licensed under MIT; see LICENSE.
+Before publishing a download on a homebrew site, verify:
 
+- [ ] The latest GitHub Actions **PSP EBOOT** build succeeds and its artifact contains `EBOOT.PBP`.
+- [ ] Both modes can finish a full shave in PPSSPP without crashes, audio glitches or missing hairs.
+- [ ] Zoom, head pitch, final-hair locator, pause/resume, restart, title navigation and tutorial work.
+- [ ] The victory orbit, stars, score and announcer behave properly after the win.
+- [ ] Test on physical PSP hardware if available, especially PSP-1000 (lower memory), or clearly state if only PPSSPP was tested.
+- [ ] Take genuine in-game screenshots and include them in a GitHub Release.
+- [ ] Publish a ZIP containing `PSP/GAME/BALDBOSS/EBOOT.PBP` with version, changelog and license.
 
-## v0.6.5 – Tondeuse, zoom en stem
+**Verification status:** Source-level integration checks have been performed for v0.9.0. A successful PSPDEV cross-compilation, PPSSPP playthrough of v0.9.0 and physical PSP testing still need confirmation. Do not label this build “fully tested on PSP” until it has been verified.
 
-- **X of vierkant ingedrukt houden:** scheren met een gegenereerd tondeusegeluid.
-- **Cirkel:** drie zoomstanden (1×, ongeveer 1,4× en 1,8×). De scheerhitbox beweegt mee met de zoom.
-- **Volledig kaal vóór de tijd op is:** eenmalige stemmelding **“Another bald boss!”**.
-- **L/R:** hoofd draaien. **D-pad/analoge stick:** tondeuse bewegen.
-- **SELECT:** achtergrondmuziek aan/uit, geluidseffecten blijven hoorbaar.
+## Reporting issues
 
-De audiothread mengt de bestaande chiptune met een originele, programmatisch gemaakte tondeusebrom en een met de vrije eSpeak-synthesizer gemaakte Engelse stem. GitHub Actions genereert via \`tools/generate_voice.py\` eerst een PCM8-header en bouwt daarna \`EBOOT.PBP\`. Lokaal bouwen: installeer eSpeak, voer \`python3 tools/generate_voice.py\` uit en daarna \`make\` met PSPDEV.
+Include your PSP model or PPSSPP version, the mode (Challenge or Zen), the steps to reproduce, and a screenshot or the GitHub Actions error log. Report problems through the repository’s GitHub Issues tab.
 
-De code heeft lokale host-syntax- en gameplaytests doorstaan. De werkelijke PSPDEV-build en PPSSPP-weergave moeten nog worden gecontroleerd.
+---
 
-## v0.7 - Deep Voice Edition soundtrack
-
-The complete **No Hair, No Fear! (Deep Voice Edition)** song now plays on the
-title screen and on the win/timeout results screens. During the 90-second
-shave challenge, a matching **instrumental** plays instead. Starting a new
-round automatically switches music. **SELECT** still toggles music only,
-while the clipper motor and **"Another bald boss!"** announcer remain audible.
-
-The full song and instrumental are **original, AI-assisted compositions** made
-with procedural synthesizers and offline free eSpeak vocals. The vocals are a
-single slow, low synthetic male voice (not a human performance). No Suno assets
-or third-party recordings are included.
-
-### Build details
-
-GitHub Actions runs `tools/generate_psp_music.py`, which reproduces the exact
-deep-voice and instrumental mixes from the committed Python generators in
-`tools/music_sources/`, then embeds both as **11,025 Hz PCM8 mono** data in
-`src/music_samples.h`. This deliberately trades hi-fi quality for PSP
-compatibility and avoids an additional OGG decoder. The generated header is not
-versioned; it is included in the PSP build artifact automatically.
-
-For a local PSPDEV build, install Python 3, NumPy, SciPy, SoundFile, ffmpeg,
-and eSpeak; then run `python3 tools/generate_voice.py` and
-`python3 tools/generate_psp_music.py` before `make`.
-
-The full-resolution OGG/WAV tracks are intended for future Windows, Linux,
-macOS, and Android ports; this repository still builds the **PSP edition**, not
-yet a native desktop/mobile game. No actual PPSSPP playback validation has
-been performed for this music change.
-
-
-## PSP v0.8.0: Rebuilt head & crown shaving
-
-The earlier distorted imported head is replaced by a purpose-built original **CC0** low-poly head with a cylindrical UV atlas and a custom **256×256 RGB565** face texture. The game generates both once at startup from `src/bald_head_v2.h` (3,120 triangles, 9,360 unpacked draw vertices).
-
-**Controls:** Hold **L + D-pad Up** to tilt the head forward and shave the crown; **L + D-pad Down** tilts back. **L** by itself still rotates left, and **R** rotates right. D-pad/analog without L moves the clippers; X/Square shaves. The last-hair locator also adjusts vertical orientation.
-
-For editable assets, `tools/export_bald_head.c` outputs a Wavefront OBJ with UVs and a matching PPM texture. Example: `gcc -O2 -std=c99 tools/export_bald_head.c -lm -o export_head && ./export_head`. The game uses that same C geometry generator at runtime. The two main sources of truth are `src/bald_head_v2.h` and `src/main.c`. Existing Deep Voice audio remains untouched.
-
-**Testing note:** The new mesh exporter and host C syntax were checked locally, including simulated crown visibility during vertical rotation; PPSSPP/real PSP verification is still required.
+*No hair. No fear. Just baldness.*
