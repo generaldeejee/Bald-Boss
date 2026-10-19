@@ -1,18 +1,32 @@
-# Bald Boss 3D — PSP Edition v0.9.2 (public beta candidate)
+# Bald Boss 3D — PSP Edition v0.9.3 (public beta candidate)
 
-**Bald Boss 3D** is an original, humorous, native PlayStation Portable (PSP) homebrew game: shave a rotating 3D head with an electric clipper, uncover the shiny scalp, and become a legendary Bald Boss.
+**Bald Boss 3D** is an original, humorous, native PlayStation Portable (PSP) homebrew game. You play the **Club Barber**: shave a rotating 3D head with an electric clipper and help applicants earn the title **Bald Boss**.
 
 ### The Elite Bald Man Club
 
 > **Only truly bald men may join. Shave these heads. Turn them into BALD BOSSES!**
 
-As the club's barber, your job is to transform hairy applicants into bona fide bald bosses. A perfect shave wins **MEMBERSHIP APPROVED!**; running out of time in Challenge Mode means **MEMBERSHIP DENIED!**. The original victory announcer still calls out **"Another bald boss!"**
+As the club's barber, your job is to transform hairy applicants into bona fide bald bosses. A completed shave earns the candidate **MEMBERSHIP APPROVED!**; running out of time in Challenge Mode means **MEMBERSHIP DENIED!**. The victory announcer celebrates each new recruit with **"Another bald boss!"**
 
-The project is still called **Bald Boss 3D**. *The Elite Bald Man Club* is the game's fictional setting and running joke.
+### Official naming guide
+
+| Name | Meaning |
+| --- | --- |
+| **Bald Boss 3D** | The name of the video game (and PSP EBOOT) |
+| **The Elite Bald Man Club** | The one and only fictional club |
+| **Club Barber** | You, the player: the person who shaves applicants |
+| **Bald Boss** | The honorary rank of each newly accepted bald club member |
+| **Membership Approved!** | An applicant has been completely shaved and accepted |
+| **Membership Denied!** | The applicant failed the timed Challenge; Zen Mode has no timeout |
+
+In the title screen, the barber's workspace is called **Club Barber's Chair**, not a second business or club. **“Another bald boss!”** refers to the newly admitted member, not a new club name.
 
 Built in C with the open-source PSPDEV/PSPSDK toolchain and PSP GU/GUM rendering. It is **not** a PS1 executable and needs **no PS1 BIOS**.
 
-## What's new in v0.9.2
+## What's new in v0.9.3
+
+- **Consistent theme (v0.9.3):** game title *Bald Boss 3D*, club *The Elite Bald Man Club*, player *Club Barber*, accepted member *Bald Boss*. Replaced the confusing *Boss Barbers* and *Elite Bald Club* aliases across the in-game menus. Win voice and music remain unchanged.
+
 
 - **More natural victory announcer (v0.9.2):** builds use the Piper **en_US-john-medium** neural male voice instead of the original robotic eSpeak rendering for “Another bald boss!”. The 22,050 Hz mono PCM8 recording is embedded in the EBOOT; **no neural-network runtime or model is shipped on PSP**. Original music and all shaving sound effects are retained.
 - **Reproducible speech generation:** the workflow downloads and SHA-256 verifies the model, caches it between builds and verifies the new header was actually generated. Requires network access to the public Piper model *only when building*. Run `python3 tools/generate_voice.py --legacy` only if you specifically want the old eSpeak voice for troubleshooting.
@@ -113,7 +127,7 @@ Before publishing a download on a homebrew site, verify:
 - [ ] Take genuine in-game screenshots and include them in a GitHub Release.
 - [ ] Publish a ZIP containing `PSP/GAME/BALDBOSS/EBOOT.PBP` with version, changelog and license.
 
-**Verification status:** Source-level integration checks have been performed for v0.9.2. The Piper neural voice generator and changed PSP sample rate still need confirmation from the GitHub Actions build and a PPSSPP listening test. A successful PSPDEV cross-compilation, PPSSPP playthrough of v0.9.0 and physical PSP testing still need confirmation. Do not label this build “fully tested on PSP” until it has been verified.
+**Verification status:** Source-level integration checks have been performed for v0.9.3. The Piper neural voice generator and changed PSP sample rate still need confirmation from the GitHub Actions build and a PPSSPP listening test. A successful PSPDEV cross-compilation, PPSSPP playthrough of v0.9.0 and physical PSP testing still need confirmation. Do not label this build “fully tested on PSP” until it has been verified.
 
 ## Reporting issues
 
