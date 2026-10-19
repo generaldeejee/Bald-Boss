@@ -1,4 +1,4 @@
-/* Bald Boss 3D - PSP Edition v0.7.1 UV face mapping fix barber UI, restart and finish camera with Deep Voice soundtrack. Original homebrew source.
+/* Bald Boss 3D - PSP Edition v0.7.2 final-hair rescue with UV face mapping barber UI, restart and finish camera with Deep Voice soundtrack. Original homebrew source.
    Uses PSPSDK GU/GUM hardware 3D renderer. No PS1 BIOS calls. */
 #include <pspkernel.h>
 #include <pspctrl.h>
@@ -75,6 +75,8 @@ static int paused=0;
 static int pause_choice=0; /* 0 resume; 1 restart; 2 return to title */
 static int finish_zoom_override=0;
 static int restart_grace=0;
+static int cleanup_bonus_given=0;
+static int cleanup_bonus_flash=0;
 static float current_camera_distance=CAM_DISTANCE;
 static float zoom_camera_distance(void){return current_camera_distance;}
 static float target_camera_distance(void){
@@ -452,6 +454,13 @@ static void draw_ui(void){
       ui_box(297,220,174,7,C(47,74,86));
       ui_text(397,226,"TRACK",.86f);
     }
+    if(phase==1 && n_hairs-removed<=3){
+      ui_box(236,194,232,18,C(10,17,26));
+      ui_text(246,199,n_hairs-removed==1?"TRI FIND  LAST HAIR SAFE":"TRI FIND REMAINING HAIR",1.0f);
+    }else if(phase==1 && cleanup_bonus_flash>0){
+      ui_box(247,192,221,20,C(10,17,26));
+      ui_text(268,199,"EXTRA 30 SECONDS!",1.0f);
+    }
     if(phase==2){
       ui_box(104,168,272,42,C(10,16,27));
       ui_text(158,181,"MASTER BARBER!",1.65f);
@@ -550,6 +559,7 @@ static void reset_game(void){
   for(int i=0;i<n_hairs;i++)hairs[i].gone=0;
   removed=0;score=0;play_frames=0;cursor_x=240;cursor_y=130;
   yaw=0;shave_flash=0;phase=1;paused=0;pause_choice=0;
+  cleanup_bonus_given=0;cleanup_bonus_flash=0;
   zoom_level=0;finish_zoom_override=0;current_camera_distance=CAM_DISTANCE;
   clipper_active=0;restart_grace=10;stop_voice_pending=1;
   win_voice_pending=0;
@@ -581,10 +591,38 @@ static void shave_at_cursor(void){
     }
   }
   if(hit)shave_flash=7;
+  if(!cleanup_bonus_given && n_hairs-removed<=10 && n_hairs-removed>0){
+    cleanup_bonus_given=1;
+    play_frames=play_frames>30*60?play_frames-30*60:0;
+    cleanup_bonus_flash=150;
+  }
   if(removed>=n_hairs && n_hairs>0 && phase==1){
     phase=2;
     clipper_active=0;
     win_voice_pending=1; /* Announce a fully shaved head just once. */
+  }
+}
+/* Final-hair locator: orient the head to a remaining strand and aim the
+   clippers at it. Off-screen inaccessible hairs are automatically cleared. */
+static void locate_final_hair(void){
+  if(phase!=1 || n_hairs-removed>3)return;
+  int target=-1;
+  for(int i=0;i<n_hairs;i++)if(!hairs[i].gone){target=i;break;}
+  if(target<0)return;
+  Hair *h=&hairs[target];
+  yaw=atan2f(-h->nx,h->nz);
+  if(yaw<0)yaw+=2*PI;
+  finish_zoom_override=1;zoom_level=0;
+  current_camera_distance=CAM_DISTANCE;
+  float sx,sy;
+  if(project_hair_screen(h,&sx,&sy)){
+    cursor_x=CLAMP(sx,35.0f,445.0f);
+    cursor_y=CLAMP(sy,60.0f,207.0f);
+  }else{
+    h->gone=1;removed++;score+=20;shave_flash=7;
+    if(removed>=n_hairs){
+      phase=2;clipper_active=0;win_voice_pending=1;
+    }
   }
 }
 static void update(void){
@@ -614,7 +652,11 @@ static void update(void){
    }
    return;
  }
- if(just&PSP_CTRL_TRIANGLE)shades_on=!shades_on;
+ if(just&PSP_CTRL_TRIANGLE){
+   if(n_hairs-removed<=3)locate_final_hair();
+   else shades_on=!shades_on;
+ }
+ if(phase!=1)return; /* Assist may have finished the run. */
  if(just&PSP_CTRL_CIRCLE){
    if(n_hairs-removed<=12)finish_zoom_override=1;
    zoom_level=(zoom_level+1)%3;
@@ -635,8 +677,9 @@ static void update(void){
  else clipper_active=(b&(PSP_CTRL_CROSS|PSP_CTRL_SQUARE))?1:0;
  if(clipper_active)shave_at_cursor();
  if(shave_flash)shave_flash--;
- play_frames++;
- if(play_frames>=90*60 && phase==1){phase=3;clipper_active=0;}
+ if(cleanup_bonus_flash>0)cleanup_bonus_flash--;
+ if(n_hairs-removed>1)play_frames++; /* One last hair: unlimited cleanup time. */
+ if(play_frames>=90*60 && phase==1 && n_hairs-removed>1){phase=3;clipper_active=0;}
 }
 
 /* Deep Voice Edition soundtrack.
