@@ -1,4 +1,4 @@
-/* Bald Boss 3D - PSP Edition v0.9.0 Zen Mode, victory results and tutorial new anatomical head, UV texture and crown pitch controls barber UI, restart and finish camera with Deep Voice soundtrack. Original homebrew source.
+/* Bald Boss 3D - PSP Edition v0.9.1 Elite Bald Man Club theme new anatomical head, UV texture and crown pitch controls barber UI, restart and finish camera with Deep Voice soundtrack. Original homebrew source.
    Uses PSPSDK GU/GUM hardware 3D renderer. No PS1 BIOS calls. */
 #include <pspkernel.h>
 #include <pspctrl.h>
@@ -503,7 +503,7 @@ static void draw_tutorial(void){
  ui_box(45,49,390,168,C(7,14,23));
  ui_box(49,53,382,160,C(25,39,53));
  ui_box(49,53,382,4,C(193,155,80));
- ui_text(151,64,"WELCOME TO BALD BOSS",1.34f);
+ ui_text(141,64,"ELITE BALD CLUB HANDBOOK",1.24f);
  ui_text(75,91,"D-PAD / ANALOG  MOVE CLIPPERS",1.0f);
  ui_text(75,105,"HOLD X / SQUARE  SHAVE HAIR",1.0f);
  ui_text(75,119,"L / R  ROTATE THE HEAD",1.0f);
@@ -523,7 +523,7 @@ static void draw_ui(void){
   ui_box(0,269,SW,3,C(57,126,139));
   ui_box(9,7,5,29,C(193,155,80));
   ui_text(19,9,"BALD BOSS",1.95f);
-  ui_text(180,12,phase==0?"BOSS BARBERS":"THE FINAL HAIRCUT",1.00f);
+  ui_text(180,12,phase==0?"ELITE BALD CLUB":"CLUB INITIATION",1.00f);
   ui_text(419,8,music_enabled?"MUSIC":"MUTED",.93f);
   if(phase!=0){
     int finishing=phase==1 && n_hairs-removed>0 && n_hairs-removed<=12 && !finish_zoom_override;
@@ -535,9 +535,10 @@ static void draw_ui(void){
     ui_box(236,61,231,151,C(10,18,28));
     ui_box(236,61,3,151,C(193,155,80));
     ui_text(268,66,"BOSS BARBERS",1.28f);
-    ui_text(251,88,"THE BALD BOSS CREED",1.10f);
-    ui_text(252,111,"BALD MEN ARE THE",1.04f);
-    ui_text(252,124,"TOUGHEST ON EARTH.",1.04f);
+    ui_text(249,85,"THE ELITE BALD MAN CLUB",1.06f);
+    ui_text(250,102,"ONLY TRULY BALD MEN MAY JOIN.",.92f);
+    ui_text(250,114,"SHAVE THESE HEADS. TURN THEM",.92f);
+    ui_text(250,126,"INTO BALD BOSSES!",.99f);
     ui_box(247,143,210,21,title_mode==0?C(58,77,92):C(21,32,44));
     ui_box(247,166,210,21,title_mode==1?C(58,77,92):C(21,32,44));
     ui_box(247,title_mode==0?143:166,4,21,C(239,192,96));
@@ -582,17 +583,20 @@ static void draw_ui(void){
     if(phase==2){
       ui_box(70,158,340,54,C(10,17,27));
       ui_box(70,158,340,3,C(193,155,80));
-      ui_text(130,164,"ANOTHER BALD BOSS!",1.40f);
+      ui_text(139,163,"MEMBERSHIP APPROVED!",1.31f);
+      ui_text(155,177,"ANOTHER BALD BOSS!",1.13f);
       int stars=victory_stars();
-      for(int i=0;i<3;i++)ui_text(204+i*24,180,i<stars?"*":"-",1.75f);
+      for(int i=0;i<3;i++)ui_text(212+i*21,189,i<stars?"*":"-",1.45f);
       char result[48];
       if(zen_mode)snprintf(result,sizeof(result),"ZEN COMPLETE  SCORE %d",score);
       else snprintf(result,sizeof(result),"SCORE %d  TIME %02d:%02d",score,play_frames/3600,(play_frames/60)%60);
-      ui_text(108,198,result,1.05f);
-      ui_text(343,198,"X REPLAY",.95f);
+      ui_text(94,202,result,.96f);
+      ui_text(343,202,"X REPLAY",.91f);
     }else if(phase==3){
-      ui_box(104,168,272,42,C(10,16,27));
-      ui_text(168,181,"TIME IS UP!",1.65f);
+      ui_box(94,158,292,54,C(10,16,27));
+      ui_box(94,158,292,3,C(193,155,80));
+      ui_text(139,169,"MEMBERSHIP DENIED!",1.29f);
+      ui_text(182,190,"TIME IS UP!",1.12f);
     }
     if(phase==3 && frame%90>45)ui_text(192,202,"X TO RESTART",1.15f);
     if(phase==1 && !paused){
