@@ -1,0 +1,5 @@
+src/voice_sample.h
+src/music_samples.h
+tools/music_sources/*.wav
+tools/music_sources/*.ogg
+tools/music_sources/*Lyrics.txt

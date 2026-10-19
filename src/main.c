@@ -1,4 +1,4 @@
-/* Bald Boss 3D - PSP Edition v0.6.5 Clipper FX, camera zoom, win announcer. Original homebrew source.
+/* Bald Boss 3D - PSP Edition v0.7 Deep Voice soundtrack, clippers, zoom. Original homebrew source.
    Uses PSPSDK GU/GUM hardware 3D renderer. No PS1 BIOS calls. */
 #include <pspkernel.h>
 #include <pspctrl.h>
@@ -42,6 +42,7 @@ typedef struct {float u,v, nx,ny,nz, x,y,z;} TexturedVertex;
 #include "head_model.h"
 #include "head_texture.h"
 #include "voice_sample.h"
+#include "music_samples.h"
 typedef struct {float nx,ny,nz, x,y,z;} LitVertex;
 typedef struct {float x,y,z;} PosVertex;
 typedef struct {unsigned int color;float x,y,z;} UiVertex;
@@ -475,45 +476,40 @@ static void update(void){
  if(play_frames>=90*60 && phase==1){phase=3;clipper_active=0;}
 }
 
-/* Original generative chiptune: no audio files, no licensed samples.
-   Three gentle synthesizer voices in a dedicated PSP audio thread.
-   44100 Hz, 16-bit signed interleaved stereo PCM, continuously streamed. */
-static const unsigned char melody_notes[32]={
-  72,76,79,76,74,77,81,77, 76,79,84,79,77,74,72,0,
-  74,77,81,77,76,79,83,79, 72,76,79,76,74,71,72,0
-};
-static const unsigned char bass_notes[8]={48,48,53,53,45,50,48,48};
-static float midi_hz(int midi){return 440.0f*powf(2.0f,(midi-69)/12.0f);}
-static float triangle_wave(float phase){return 1.0f-4.0f*fabsf(phase-0.5f);}
-/* The clipper motor is procedural, and the prerecorded synthesized
-   announcement is 11.025 kHz PCM8 mixed with the existing PSP chiptune. */
+/* Deep Voice Edition soundtrack.
+   Both tracks are PCM8 mono at 11,025 Hz, generated from the ORIGINAL full
+   and instrumental mixes during the GitHub Actions build. No OGG decoder is
+   needed on PSP: we interpolate 4:1 in the existing 44,100-Hz audio thread.
+   Title/results: full song; while shaving: instrumental song. */
+static float triangle_wave(float p){return 1.0f-4.0f*fabsf(p-0.5f);}
 static int audio_thread(SceSize args,void *argp){
  (void)args;(void)argp;
  int ch=sceAudioChReserve(PSP_AUDIO_NEXT_CHANNEL,AUDIO_SAMPLES,PSP_AUDIO_FORMAT_STEREO);
  if(ch<0)return 0;
  audio_channel=ch;
- float melody_phase=0.0f,bass_phase=0.0f,chord_phase=0.0f;
  float motor_phase=0.0f,motor2_phase=0.0f,motor_env=0.0f;
- int step=0,within_step=0,bufno=0,voice_sample_pos=-1;
- float mel_hz=midi_hz(72),bass_hz=midi_hz(48),chord_hz=midi_hz(60);
- unsigned int noise=0x159e1u;
+ int bufno=0,voice_sample_pos=-1,last_track=-1;
+ unsigned int song_pos=0,noise=0x159e1u;
  while(1){
   short *buf=audio_pcm[bufno];
+  /* Take a snapshot per buffer; avoids a mid-buffer track/data mismatch. */
+  int track_kind=(phase==1)?1:0;
+  if(track_kind!=last_track){last_track=track_kind;song_pos=0;}
+  const unsigned char *track=track_kind?bald_music_instrumental:bald_music_full;
+  const unsigned int track_len=track_kind?BALD_MUSIC_INSTRUMENTAL_LEN:BALD_MUSIC_FULL_LEN;
   if(stop_voice_pending){voice_sample_pos=-1;stop_voice_pending=0;}
   if(win_voice_pending){voice_sample_pos=0;win_voice_pending=0;}
   for(int i=0;i<AUDIO_SAMPLES;i++){
-   if(within_step==0){
-     mel_hz=melody_notes[step]?midi_hz(melody_notes[step]):0.0f;
-     bass_hz=midi_hz(bass_notes[(step/4)%8]);
-     chord_hz=midi_hz((step/8)%2?67:64);
-   }
-   float env=1.0f-(float)within_step/(float)MUSIC_STEP_SAMPLES;
-   float melody=mel_hz>0.0f?triangle_wave(melody_phase)*env*.32f:0.0f;
-   float bass=triangle_wave(bass_phase)*.16f;
-   float chord=triangle_wave(chord_phase)*.065f;
+   /* Recorded source is 11,025 Hz; four output frames per input sample.
+      Loop naturally and start each scene's track from the beginning. */
+   unsigned int k=song_pos>>2;
+   unsigned int next=k+1<track_len?k+1:0;
+   float sample0=((int)track[k]-128)*(1.0f/128.0f);
+   float sample1=((int)track[next]-128)*(1.0f/128.0f);
+   float song=sample0+(sample1-sample0)*((song_pos&3)*0.25f);
+   float fade=song_pos<4096?(float)song_pos/4096.0f:1.0f;
+   if(++song_pos>=track_len*4u)song_pos=0;
    noise=noise*1664525u+1013904223u;
-   float beat=(within_step<1350 && (step%2)==0)
-      ?(1.0f-(float)within_step/1350.0f)*((noise&65535)/32768.0f-1.0f)*.070f:0.0f;
    float target=clipper_active?1.0f:0.0f;
    motor_env+=(target-motor_env)*.0034f;
    float clipper=(triangle_wave(motor_phase)*.17f+
@@ -525,24 +521,21 @@ static int audio_thread(SceSize args,void *argp){
    if(motor2_phase>=1.0f)motor2_phase-=1.0f;
    float voice=0.0f;
    if(voice_sample_pos>=0){
-      int k=voice_sample_pos>>2;
-      if(k>=VOICE_SAMPLE_LEN)voice_sample_pos=-1;
-      else{
-        float v0=((int)voice_sample[k]-128)/128.0f;
-        float v1=((int)voice_sample[k+1<VOICE_SAMPLE_LEN?k+1:k]-128)/128.0f;
-        voice=(v0+(v1-v0)*(float)(voice_sample_pos&3)*.25f)*.65f;
-        voice_sample_pos++;
-      }
+     int ix=voice_sample_pos>>2;
+     if(ix>=VOICE_SAMPLE_LEN)voice_sample_pos=-1;
+     else{
+       float v0=((int)voice_sample[ix]-128)*(1.0f/128.0f);
+       float v1=((int)voice_sample[ix+1<VOICE_SAMPLE_LEN?ix+1:ix]-128)*(1.0f/128.0f);
+       voice=(v0+(v1-v0)*((voice_sample_pos&3)*.25f))*.65f;
+       voice_sample_pos++;
+     }
    }
-   float music_gain=voice_sample_pos>=0?.22f:(motor_env>.02f?.48f:1.0f);
-   float sound=(music_enabled?(melody+bass+chord+beat)*music_gain:0.0f)+clipper+voice;
+   /* Music ducks for clipper and announcer. SELECT mutes only music. */
+   float music_gain=voice_sample_pos>=0?.20f:(motor_env>.02f?.34f:.62f);
+   float sound=(music_enabled?song*fade*music_gain:0.0f)+clipper+voice;
    sound=CLAMP(sound,-.96f,.96f);
    short pcm=(short)(sound*22000.0f);
    buf[i*2]=pcm;buf[i*2+1]=pcm;
-   melody_phase+=mel_hz/AUDIO_RATE;if(melody_phase>=1.0f)melody_phase-=1.0f;
-   bass_phase+=bass_hz/AUDIO_RATE;if(bass_phase>=1.0f)bass_phase-=1.0f;
-   chord_phase+=chord_hz/AUDIO_RATE;if(chord_phase>=1.0f)chord_phase-=1.0f;
-   within_step++;if(within_step>=MUSIC_STEP_SAMPLES){within_step=0;step=(step+1)%32;}
   }
   sceKernelDcacheWritebackRange(buf,AUDIO_SAMPLES*2*sizeof(short));
   if(sceAudioOutputBlocking(ch,PSP_AUDIO_VOLUME_MAX,buf)<0)break;

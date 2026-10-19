@@ -5,28 +5,37 @@ on:
     paths:
       - "src/**"
       - "tools/generate_voice.py"
+      - "tools/generate_psp_music.py"
+      - "tools/music_sources/**"
       - "assets/**"
       - "Makefile"
       - ".github/workflows/build-psp.yml"
 
 jobs:
-  generate-voice:
+  generate-audio:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install free speech synthesizer
+      - name: Install free music-generation dependencies
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y espeak
-      - name: Generate "Another bald boss!" audio
-        run: python3 tools/generate_voice.py
+          sudo apt-get install -y espeak ffmpeg libsndfile1
+          python3 -m pip install --user numpy scipy soundfile
+      - name: Generate announcer and both Deep Voice tracks
+        run: |
+          python3 tools/generate_voice.py
+          python3 tools/generate_psp_music.py
+          test -s src/voice_sample.h
+          test -s src/music_samples.h
       - uses: actions/upload-artifact@v4
         with:
-          name: BaldBoss-Voice-Sample
-          path: src/voice_sample.h
+          name: BaldBoss-PSP-Audio
+          path: |
+            src/voice_sample.h
+            src/music_samples.h
           if-no-files-found: error
   psp-build:
-    needs: generate-voice
+    needs: generate-audio
     runs-on: ubuntu-latest
     container:
       image: pspdev/pspdev:latest
@@ -34,7 +43,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: BaldBoss-Voice-Sample
+          name: BaldBoss-PSP-Audio
           path: src
       - name: Build with PSPSDK
         run: make -j2
