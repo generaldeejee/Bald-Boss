@@ -1,4 +1,4 @@
-/* Bald Boss 3D - PSP Edition v0.9.1 Elite Bald Man Club theme new anatomical head, UV texture and crown pitch controls barber UI, restart and finish camera with Deep Voice soundtrack. Original homebrew source.
+/* Bald Boss 3D - PSP Edition v0.9.2 natural victory announcer new anatomical head, UV texture and crown pitch controls barber UI, restart and finish camera with Deep Voice soundtrack. Original homebrew source.
    Uses PSPSDK GU/GUM hardware 3D renderer. No PS1 BIOS calls. */
 #include <pspkernel.h>
 #include <pspctrl.h>
@@ -980,12 +980,16 @@ static int audio_thread(SceSize args,void *argp){
    if(motor2_phase>=1.0f)motor2_phase-=1.0f;
    float voice=0.0f;
    if(voice_sample_pos>=0){
-     int ix=voice_sample_pos>>2;
+     /* Accept 11.025 or 22.05 kHz announcers at the 44.1 kHz mixer rate.
+        New 22.05 kHz neural speech retains substantially more consonant detail. */
+     const int voice_factor=AUDIO_RATE/VOICE_SAMPLE_RATE;
+     int ix=voice_sample_pos/voice_factor;
      if(ix>=VOICE_SAMPLE_LEN)voice_sample_pos=-1;
      else{
        float v0=((int)voice_sample[ix]-128)*(1.0f/128.0f);
        float v1=((int)voice_sample[ix+1<VOICE_SAMPLE_LEN?ix+1:ix]-128)*(1.0f/128.0f);
-       voice=(v0+(v1-v0)*((voice_sample_pos&3)*.25f))*.65f;
+       float fraction=(float)(voice_sample_pos%voice_factor)/(float)voice_factor;
+       voice=(v0+(v1-v0)*fraction)*.72f;
        voice_sample_pos++;
      }
    }
