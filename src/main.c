@@ -1,4 +1,4 @@
-/* Bald Boss 3D - PSP Edition v0.4 (integrated low-poly head, face texture and finer stubble). Original homebrew source.
+/* Bald Boss 3D - PSP Edition v0.5 (recessed eyes, restored face, intro, safe layout). Original homebrew source.
    Uses PSPSDK GU/GUM hardware 3D renderer. No PS1 BIOS calls. */
 #include <pspkernel.h>
 #include <pspctrl.h>
@@ -26,9 +26,9 @@ PSP_MAIN_THREAD_ATTR(THREAD_ATTR_USER | THREAD_ATTR_VFPU);
 #define AUDIO_SAMPLES 1024
 #define AUDIO_RATE 44100
 #define MUSIC_STEP_SAMPLES 11025
-#define CAM_DISTANCE 4.72f
-#define CAM_Y 0.10f
-#define FOCAL_PIXELS 304.0f
+#define CAM_DISTANCE 5.70f
+#define CAM_Y 0.08f
+#define FOCAL_PIXELS 312.5f
 #define MAX_HAIR_VERTS (HAIRS*6)
 #define MAX_HEAD_VERTS (HR*HS*6)
 #define HUD_QUADS 4096 /* font is now drawn using reliable solid-color sprite rectangles */
@@ -352,65 +352,76 @@ static void ui_text(float x,float y,const char *s,float scale){
 }
 static void draw_ui(void){
   n_hud=0;
-  /* Overlay backgrounds and barber-shop graphic accents. */
   ui_box(0,0,SW,43,C(10,16,27));
   ui_box(0,43,SW,2,C(64,184,179));
   ui_box(0,218,SW,54,C(10,16,27));
   ui_box(0,217,SW,1,C(67,136,142));
-  ui_box(14,233,110,6,C(43,56,67));
-  ui_box(14,233,(110*removed)/(n_hairs?n_hairs:1),6,C(61,222,171));
-  ui_box(141,227,1,31,C(46,65,80));
-  ui_box(298,227,1,31,C(46,65,80));
-  if(phase==0){
-    ui_box(82,174,318,30,C(10,16,27));
-    ui_text(130,179,"PRESS X TO START",2.1f);
-  } else if(phase==2){
-    ui_box(87,169,315,38,C(10,16,27));
-    ui_text(133,179,"MASTER BARBER!",2.1f);
-  } else if(phase==3){
-    ui_box(75,169,332,38,C(10,16,27));
-    ui_text(133,179,"TIME IS UP!",2.1f);
-  }
-  if(phase!=1 && frame%90>45){ui_text(170,203,"X TO RESTART",1.35f);}
-  /* Cursor and clipper in the gameplay, and a short crosshair. */
-  if(phase==1){
-    int cx=(int)cursor_x,cy=(int)cursor_y;
-    ui_box(cx-9,cy-27,18,28,C(35,45,59));
-    ui_box(cx-8,cy-29,16,6,C(189,199,206));
-    for(int i=-6;i<=6;i+=4)ui_box(cx+i,cy-33,2,5,C(222,230,229));
-    ui_box(cx-5,cy-9,10,8,shave_flash?C(61,228,183):C(42,184,202));
-    ui_box(cx-1,cy+5,2,9,C(255,221,135));
-  }
-  ui_text(13,9,"BALD BOSS",2.2f);
-  ui_text(198,14,"PSP EDITION",1.15f);
-  ui_text(389,13,music_enabled?"MUSIC ON":"MUSIC OFF",1.0f);
-  char buf[32];
-  ui_text(13,224,"SHAVED",1.15f);
-  snprintf(buf,sizeof(buf),"%d%%",n_hairs?removed*100/n_hairs:0);
-  ui_text(14,243,buf,1.85f);
-  ui_text(155,224,"SCORE",1.15f);
-  snprintf(buf,sizeof(buf),"%d",score);
-  ui_text(155,243,buf,1.85f);
-  ui_text(311,224,"TIME",1.15f);
-  int seconds=90-play_frames/60;if(seconds<0)seconds=0;
-  snprintf(buf,sizeof(buf),"%02d:%02d",seconds/60,seconds%60);
-  ui_text(312,243,buf,1.85f);
-  if(phase==0){ui_text(172,56,"THE FINAL HAIRCUT",1.2f);
-    ui_text(162,209,"TRI SHADES  SELECT MUSIC",.9f);}
-  /* HUD geometry is CPU-generated and must be visible to the GE. */
-  sceKernelDcacheWritebackAll();
-  sceGuDisable(GU_LIGHTING);sceGuDisable(GU_DEPTH_TEST);sceGuDisable(GU_TEXTURE_2D);sceGuDisable(GU_BLEND);
-  sceGuDrawArray(GU_SPRITES,GU_COLOR_8888|GU_VERTEX_32BITF|GU_TRANSFORM_2D,n_hud,0,hud);
-  /* All HUD rectangles and letters are now drawn by the call above. */
-}
+  ui_text(13,9,"BALD BOSS",2.1f);
+  ui_text(178,14,phase==0?"THE FINAL HAIRCUT":"PSP EDITION",1.05f);
+  ui_text(394,13,music_enabled?"MUSIC ON":"MUSIC OFF",.98f);
 
+  if(phase==0){
+    /* A dedicated intro panel sits beside the smaller rotating portrait. */
+    ui_box(236,61,231,151,C(10,16,27));
+    ui_box(236,61,3,151,C(64,184,179));
+    ui_text(251,73,"THE BALD BOSS CREED",1.17f);
+    ui_text(252,103,"BALD MEN ARE THE",1.04f);
+    ui_text(252,119,"TOUGHEST ON EARTH.",1.04f);
+    ui_text(252,147,"ONLY TRUE BALD BOSSES",.90f);
+    ui_text(252,160,"WELCOME HERE.",.90f);
+    ui_text(263,187,"PRESS X TO START",1.28f);
+    ui_text(18,229,"NO WIGS. NO FEAR. JUST BALDNESS.",1.02f);
+    ui_text(19,252,"L/R TURN   TRI SHADES   SELECT MUSIC",.89f);
+  } else {
+    ui_box(14,233,110,6,C(43,56,67));
+    ui_box(14,233,(110*removed)/(n_hairs?n_hairs:1),6,C(61,222,171));
+    ui_box(141,227,1,31,C(46,65,80));
+    ui_box(298,227,1,31,C(46,65,80));
+    ui_text(13,224,"SHAVED",1.15f);
+    char buf[32];
+    snprintf(buf,sizeof(buf),"%d%%",n_hairs?removed*100/n_hairs:0);
+    ui_text(14,243,buf,1.85f);
+    ui_text(155,224,"SCORE",1.15f);
+    snprintf(buf,sizeof(buf),"%d",score);
+    ui_text(155,243,buf,1.85f);
+    ui_text(311,224,"TIME",1.15f);
+    int seconds=90-play_frames/60;if(seconds<0)seconds=0;
+    snprintf(buf,sizeof(buf),"%02d:%02d",seconds/60,seconds%60);
+    ui_text(312,243,buf,1.85f);
+    if(phase==2){
+      ui_box(104,168,272,42,C(10,16,27));
+      ui_text(158,181,"MASTER BARBER!",1.65f);
+    }else if(phase==3){
+      ui_box(104,168,272,42,C(10,16,27));
+      ui_text(168,181,"TIME IS UP!",1.65f);
+    }
+    if(phase!=1 && frame%90>45)ui_text(192,202,"X TO RESTART",1.15f);
+    if(phase==1){
+      int cx=(int)cursor_x,cy=(int)cursor_y;
+      ui_box(cx-9,cy-27,18,28,C(35,45,59));
+      ui_box(cx-8,cy-29,16,6,C(189,199,206));
+      for(int i=-6;i<=6;i+=4)ui_box(cx+i,cy-33,2,5,C(222,230,229));
+      ui_box(cx-5,cy-9,10,8,shave_flash?C(61,228,183):C(42,184,202));
+      ui_box(cx-1,cy+5,2,9,C(255,221,135));
+    }
+  }
+  /* PSP 2D sprite font: proven in PPSSPP, no problematic texture UVs. */
+  sceKernelDcacheWritebackAll();
+  sceGuDisable(GU_LIGHTING);sceGuDisable(GU_DEPTH_TEST);
+  sceGuDisable(GU_TEXTURE_2D);sceGuDisable(GU_BLEND);
+  sceGuDrawArray(GU_SPRITES,GU_COLOR_8888|GU_VERTEX_32BITF|GU_TRANSFORM_2D,n_hud,0,hud);
+}
 
 static void render_head(void){
   /* Perspective projection, real depth test, smooth per-vertex normals. */
   sceGumMatrixMode(GU_PROJECTION);sceGumLoadIdentity();sceGumPerspective(47.0f,(float)SW/SH,0.1f,20.0f);
   sceGumMatrixMode(GU_VIEW);sceGumLoadIdentity();
   sceGumMatrixMode(GU_MODEL);sceGumLoadIdentity();
-  ScePspFVector3 pos={0,CAM_Y,-CAM_DISTANCE};sceGumTranslate(&pos);
+  /* Smaller portrait on the title screen makes room for the introduction. */
+  ScePspFVector3 pos={phase==0?-1.15f:0.0f,
+                      phase==0?0.06f:CAM_Y,
+                      phase==0?-7.40f:-CAM_DISTANCE};
+  sceGumTranslate(&pos);
   ScePspFVector3 rot={0,yaw,0};sceGumRotateXYZ(&rot);
   sceGuEnable(GU_DEPTH_TEST);sceGuDepthMask(GU_FALSE);
   sceGuEnable(GU_LIGHTING);sceGuEnable(GU_LIGHT0);
@@ -429,26 +440,40 @@ static void render_head(void){
   sceGuColor(0xffffffff);
   sceGumDrawArray(GU_TRIANGLES,GU_TEXTURE_32BITF|GU_NORMAL_32BITF|GU_VERTEX_32BITF|GU_TRANSFORM_3D,n_head,0,head);
   draw_beard_stubble();
-  /* Ears, eye globes, pupils and eyelids stay as light geometry accents only. */
+  /* Compact ears; eyes recessed into the actual eye sockets. */
   for(int side=-1;side<=1;side+=2){
     float sign=(float)side;
-    draw_ellipsoid(sign*.80f,-.07f,-.02f,.17f,.24f,.12f,C(204,151,126),10,14);
-    draw_ellipsoid(sign*.85f,-.055f,.05f,.070f,.14f,.040f,C(138,92,79),8,12);
-    draw_ellipsoid(sign*.34f,.11f,.84f,.160f,.076f,.042f,C(235,228,210),8,14);
-    draw_ellipsoid(sign*.34f,.11f,.877f,.055f,.055f,.020f,C(84,117,108),8,12);
-    draw_ellipsoid(sign*.34f,.11f,.897f,.025f,.038f,.011f,C(20,24,28),7,10);
-    draw_ellipsoid(sign*.34f,.18f,.862f,.16f,.020f,.026f,C(182,125,104),5,12);
-    draw_ellipsoid(sign*.34f,.045f,.862f,.16f,.020f,.026f,C(173,120,101),5,12);
+    draw_ellipsoid(sign*.81f,-.07f,-.03f,.158f,.226f,.107f,C(205,150,124),10,14);
+    draw_ellipsoid(sign*.855f,-.05f,.047f,.063f,.132f,.030f,C(140,91,80),8,12);
+    /* Face surface at x=+/-0.29,y=0.10 is approximately z=0.68. */
+    draw_ellipsoid(sign*.292f,.102f,.665f,.157f,.082f,.060f,C(134,89,78),9,14);
+    draw_ellipsoid(sign*.292f,.102f,.686f,.127f,.064f,.045f,C(237,229,210),10,16);
+    draw_ellipsoid(sign*.292f,.102f,.727f,.049f,.049f,.012f,C(85,121,108),8,12);
+    draw_ellipsoid(sign*.292f,.102f,.740f,.024f,.037f,.009f,C(24,30,30),7,10);
+    draw_ellipsoid(sign*.311f,.125f,.751f,.010f,.011f,.005f,C(245,242,231),5,8);
+    draw_ellipsoid(sign*.292f,.171f,.705f,.163f,.023f,.027f,C(185,124,102),6,14);
+    draw_ellipsoid(sign*.292f,.048f,.700f,.163f,.022f,.024f,C(173,118,101),5,14);
+    draw_ellipsoid(sign*.303f,.254f,.661f,.191f,.026f,.029f,C(66,47,42),6,14);
   }
-  /* Optional sunglasses stay available but default off. */
+  /* Nose bridge, tip and inset nostrils. */
+  draw_ellipsoid(0.0f,-.030f,.776f,.079f,.203f,.082f,C(210,153,126),12,16);
+  draw_ellipsoid(0.0f,-.214f,.869f,.127f,.073f,.082f,C(220,161,132),12,18);
+  draw_ellipsoid(-.095f,-.252f,.862f,.054f,.045f,.041f,C(204,144,118),9,12);
+  draw_ellipsoid(.095f,-.252f,.862f,.054f,.045f,.041f,C(204,144,118),9,12);
+  draw_ellipsoid(-.083f,-.292f,.894f,.028f,.016f,.011f,C(82,52,47),6,11);
+  draw_ellipsoid(.083f,-.292f,.894f,.028f,.016f,.011f,C(82,52,47),6,11);
+  /* Flatter upper and lower lip and a chin contour. */
+  draw_ellipsoid(0.0f,-.440f,.735f,.189f,.030f,.028f,C(153,94,86),8,16);
+  draw_ellipsoid(0.0f,-.472f,.745f,.182f,.013f,.021f,C(93,57,55),7,16);
+  draw_ellipsoid(0.0f,-.510f,.742f,.178f,.035f,.032f,C(186,114,102),8,16);
+  draw_ellipsoid(0.0f,-.633f,.700f,.186f,.054f,.021f,C(187,132,112),8,15);
   if(shades_on){
-    draw_ellipsoid(-.375f,.140f,.918f,.332f,.169f,.043f,C(17,29,39),10,18);
-    draw_ellipsoid(.375f,.140f,.918f,.332f,.169f,.043f,C(17,29,39),10,18);
-    draw_ellipsoid(-.375f,.280f,.906f,.335f,.030f,.034f,C(33,29,28),7,18);
-    draw_ellipsoid(.375f,.280f,.906f,.335f,.030f,.034f,C(33,29,28),7,18);
-    draw_ellipsoid(0.0f,.195f,.970f,.148f,.027f,.039f,C(178,140,80),6,14);
-    draw_ellipsoid(-.392f,.139f,.962f,.275f,.013f,.014f,C(205,174,95),5,14);
-    draw_ellipsoid(.392f,.139f,.962f,.275f,.013f,.014f,C(205,174,95),5,14);
+    for(int side=-1;side<=1;side+=2){
+      float sign=(float)side;
+      draw_ellipsoid(sign*.292f,.110f,.756f,.244f,.115f,.032f,C(17,29,39),9,17);
+      draw_ellipsoid(sign*.292f,.208f,.746f,.253f,.026f,.025f,C(33,29,28),6,16);
+    }
+    draw_ellipsoid(0.0f,.155f,.802f,.092f,.020f,.027f,C(178,140,80),6,13);
   }
   draw_ellipsoid(0.0f,-1.13f,-.11f,.34f,.42f,.30f,C(186,126,103),10,14);
   draw_ellipsoid(0.0f,-1.72f,-.28f,1.12f,.56f,.52f,C(31,47,68),9,18);
@@ -489,7 +514,7 @@ static void update(void){
  if(just&PSP_CTRL_SELECT)music_enabled=!music_enabled;
  if(phase!=1){
    if(just&PSP_CTRL_CROSS)reset_game();
-   else if(phase==0)yaw+=.007f;
+   else if(phase==0)yaw=0.10f*sinf((float)frame*0.010f);
    return;
  }
  if(b&PSP_CTRL_LTRIGGER)yaw-=.034f;
