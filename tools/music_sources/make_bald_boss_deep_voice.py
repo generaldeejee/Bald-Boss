@@ -3,16 +3,18 @@
 
 Generates a new game-ready soundtrack with procedural rhythm-guitar,
 analog-style synth layers, enhanced stadium percussion, a lead-hook,
-and a deliberately synthetic male-voice chant made using eSpeak.
+and a naturalized rhythmic rock chant from a Piper neural male voice.
 
 The source instrumental (also generated locally with no third-party samples)
 is the Bald_Boss_No_Hair_No_Fear_Instrumental.wav produced by
 make_bald_boss_rock.py. Both scripts are available with the game music.
 
-This is an ORIGINAL composition and sound design; it is not a recording of a
-human singer. No Suno samples, existing songs, or copyrighted recordings used.
+This is an ORIGINAL composition with synthesized spoken-rock vocals, not
+live human singing. No Suno assets, existing songs or third-party recordings.
+The neural voice is trained using public-domain LibriVox material; build only.
 
-Requires: python3, numpy, scipy, soundfile, eSpeak, ffmpeg.
+Requires: python3, numpy, scipy, soundfile, piper-tts==1.3.0, ffmpeg.
+Model downloaded/verified by tools/generate_voice.py; never shipped to PSP.
 """
 from pathlib import Path
 import subprocess, io, wave
@@ -148,64 +150,115 @@ for bar in (15,23,27,35):
     for j,base in enumerate((215,175,135,110)):
         tom(pos(bar,2+.5*j),base,.19)
 
-# Single low male voice. No chipmunk layers or sped-up syllables.
-# Speech is rendered at a natural pace rather than squeezed into a beat.
-def speak_deep(words, speed=150, pitch=16):
-    raw=subprocess.run(['espeak','-v','en-us+m3','-p',str(pitch),'-s',str(speed),
-        '-a','190','--stdout',words],stdout=subprocess.PIPE,check=True).stdout
-    with wave.open(io.BytesIO(raw),'rb') as f:
-        x=np.frombuffer(f.readframes(f.getnframes()),dtype='<i2').astype(np.float32)/32768
-        rate=f.getframerate()
-    y=resample_poly(x,SR,rate).astype(np.float32)
-    # Remove eSpeak's lengthy ending silence without deleting the last sound.
-    active=np.flatnonzero(np.abs(y)>.009)
+# Natural, expressive male vocal: same verified neural voice used for the
+# "Another bald boss!" announcer. Only its PCM rendering enters the PSP build.
+# Piper is neural text-to-speech (NOT a singing synthesizer), so we deliberately
+# arrange intelligible, rhythmic arena-rock *spoken chants*, not fake pitch-
+# shifted singing or eSpeak's robotic monotone.
+import os
+import sys
+from math import gcd
+from piper import PiperVoice
+from piper.config import SynthesisConfig
+
+sys.path.insert(0, str(OUT.parent))
+from generate_voice import get_voice
+
+voice_cache = Path(os.environ.get(
+    "BALD_BOSS_PIPER_CACHE", str(OUT.parent.parent / ".cache" / "piper")
+))
+model, voice_cfg = get_voice(voice_cache)
+singer = PiperVoice.load(str(model), config_path=str(voice_cfg))
+if singer.config.sample_rate != 22050:
+    raise ValueError("The song's neural voice must be 22,050 Hz")
+print("Generating humanized rock chants with Piper John (no eSpeak vocals)")
+
+# The pace, emphasis and spoken punctuation change naturally with each line.
+# These settings control the neural delivery, not digital pitch shifting.
+def speak_natural(words, style="verse", take=0):
+    is_hook = style != "verse"
+    length_scale = (0.84 if is_hook else 0.98) + (take % 4)*.026
+    syn = SynthesisConfig(
+        length_scale=length_scale,
+        noise_scale=(0.76 if is_hook else 0.69) + (take % 3)*.035,
+        noise_w_scale=(0.93 if is_hook else 0.82) + (take % 5)*.022,
+        normalize_audio=False,
+    )
+    rendered = [c.audio_float_array.astype(np.float32)
+                for c in singer.synthesize(words, syn_config=syn)]
+    if not rendered:
+        raise ValueError("Empty neural voice output for: " + words)
+    y = np.concatenate(rendered)
+    factor = gcd(int(singer.config.sample_rate), SR)
+    y = resample_poly(y, SR//factor,
+                      int(singer.config.sample_rate)//factor).astype(np.float32)
+    # Trim quiet AI-generated silence, preserve consonants and short breaths.
+    active = np.flatnonzero(np.abs(y) > .010)
     if active.size:
-        y=y[:min(len(y),active[-1]+int(.09*SR))]
-    # Playback at ~94% speed lowers the voice naturally, with no fast-pitch artifact.
-    y=resample_poly(y,100,94).astype(np.float32)
-    y=filter_audio(y,low=84,high=3700)
-    y=np.tanh(y*1.4)
-    n=len(y)
-    fade_in=min(n//3,int(.025*SR))
-    fade_out=min(n//3,int(.060*SR))
-    if fade_in: y[:fade_in]*=np.linspace(0,1,fade_in)
-    if fade_out: y[-fade_out:]*=np.linspace(1,0,fade_out)
+        front = max(0, int(active[0]) - int(.045*SR))
+        end = min(len(y), int(active[-1]) + int(.10*SR))
+        y = y[front:end]
+    if len(y) < int(.12*SR):
+        raise ValueError("Voice phrase too short: " + words)
+    y = filter_audio(y, low=82, high=6500)
+    # Warm, even rock mix without chopping peaks into a distorted robot voice.
+    rms = float(np.sqrt(np.mean(y*y) + 1e-10))
+    gain = min(2.4, .16/max(rms, .035))
+    y = np.tanh(y*gain*1.3)/np.tanh(1.3)
+    n = len(y)
+    attack = min(n//3, int((.017 if is_hook else .028)*SR))
+    release = min(n//3, int((.060 if is_hook else .10)*SR))
+    if attack:
+        y[:attack] *= np.linspace(0,1,attack,dtype=np.float32)
+    if release:
+        y[-release:] *= np.linspace(1,0,release,dtype=np.float32)
     return y
 
-def vocal_event(t, words, strength=.32, speed=150):
-    y=speak_deep(words,speed=speed)
-    add(V,t,y,strength,pan=0)
+def vocal_event(t, words, strength=.29, style="verse", take=0):
+    y = speak_natural(words, style=style, take=take)
+    add(V, t, y, strength, pan=0)
+    # One singer, with *quiet* room/slapback reflections, not doubled voices.
+    if style == "chorus":
+        add(V, t+.13, y, strength*.13, pan=-.32)
+        add(V, t+.27, y, strength*.065, pan=.34)
+    elif style == "outro":
+        add(V, t+.21, y, strength*.10, pan=.28)
 
-# Deliberately paced spoken verse; entire lines play without being sped up.
-verse_lines=[
- (4,'Mirror mirror clear the way'),
- (6,'Every hair has had its day'),
- (8,'Clippers buzzing feel the power'),
- (10,'Time to shine this is the hour'),
- (12,'Raise your razors make it clear'),
- (14,'The shiny legend now is here'),
+# The original rhyme, order, arrangement and instruments are unchanged.
+# Use natural sentence punctuation so the announcer inflects each phrase.
+verse_lines = [
+ (4,"Mirror, mirror, clear the way."),
+ (6,"Every hair has had its day."),
+ (8,"Clippers buzzing, feel the power!"),
+ (10,"Time to shine, this is the hour."),
+ (12,"Raise your razors, make it clear!"),
+ (14,"The shiny legend now is here."),
 ]
-for bar,words in verse_lines:
-    vocal_event(pos(bar,.08),words,strength=.23,speed=148)
+for idx,(bar,words) in enumerate(verse_lines):
+    vocal_event(pos(bar,.08),words,strength=.24+(.015 if idx%2 else 0),
+                style="verse",take=idx)
 
-# Chorus chant: ONE deep lead singer only, no gang shouts/stacked voices.
-chant_pattern=[
- (0,0,'NO HAIR'),(0,2,'NO FEAR'),
- (2,0,'BALD BOSS'),(2,2,'IS HERE'),
- (4,0,'SHAVE IT OFF'),(4,2.7,'MAKE IT CLEAR'),
- (6,0,'SHINY HEADS'),(6,2.5,'WE CHEER'),
+# A call-and-response styled by one expressive male performer. Variants
+# introduce human-like emphasis without chipmunk harmonies or cloned voices.
+chant_pattern = [
+ (0,0,"No hair!"),(0,2,"No fear!"),
+ (2,0,"Bald boss!"),(2,2,"Is here!"),
+ (4,0,"Shave it off!"),(4,2.7,"Make it clear!"),
+ (6,0,"Shiny heads!"),(6,2.5,"We cheer!"),
 ]
-for base in (16,28):
-    for bo,bt,words in chant_pattern:
-        vocal_event(pos(base+bo,bt+.05),words,strength=.49,speed=153)
+for repeat, base in enumerate((16,28)):
+    for idx,(bar_offset,beat_offset,words) in enumerate(chant_pattern):
+        vocal_event(pos(base+bar_offset,beat_offset+.05), words,
+                    strength=.35+(.025 if idx%2 else 0),
+                    style="chorus",take=idx+repeat*3)
 
-vocal_event(pos(0,.15),'BALD BOSS',strength=.45,speed=148)
-vocal_event(pos(36,.12),'BALD BOSS',strength=.57,speed=143)
-vocal_event(pos(38,.12),'NO HAIR, NO FEAR',strength=.52,speed=148)
+vocal_event(pos(0,.15),"Bald boss!",strength=.37,style="chorus",take=3)
+vocal_event(pos(36,.12),"Bald boss!",strength=.43,style="outro",take=7)
+vocal_event(pos(38,.12),"No hair, no fear!",strength=.40,style="outro",take=8)
 
 # Avoid high-pitched vowel pads as well: only guitar, bass, drums and one deep lead.
 background=backing*.72+S*.95
-full=background*.91+V*1.55
+full=background*.91+V*1.12
 instrumental=background.copy()
 
 def master(y):
@@ -233,7 +286,7 @@ clip[-int(.3*SR):]*=np.linspace(1,0,int(.3*SR),dtype=np.float32)[:,None]
 sf.write(OUT/'Bald_Boss_80s_Deep_Chorus.wav',clip,SR,subtype='PCM_16')
 subprocess.run(['ffmpeg','-y','-loglevel','error','-i',str(OUT/'Bald_Boss_80s_Deep_Chorus.wav'),'-c:a','libvorbis','-q:a','5',str(OUT/'Bald_Boss_80s_Deep_Chorus.ogg')],check=True)
 
-(OUT/'Bald_Boss_80s_Deep_Lyrics.txt').write_text('''BALD BOSS — NO HAIR, NO FEAR!\nOriginal 80s arena rock mix\n\nVERSE\nMirror, mirror, clear the way\nEvery hair has had its day\nClippers buzzing, feel the power\nTime to shine, this is the hour\nRaise your razors, make it clear\nThe shiny legend now is here\n\nCHORUS\nNO HAIR! NO FEAR!\nBALD BOSS IS HERE!\nSHAVE IT OFF! MAKE IT CLEAR!\nSHINY HEADS, WE CHEER!\n\n[Guitar-style solo]\n\nCHORUS [repeat]\nNO HAIR! NO FEAR!\nBALD BOSS IS HERE!\nSHAVE IT OFF! MAKE IT CLEAR!\nSHINY HEADS, WE CHEER!\n\nOUTRO\nBALD BOSS!\nNO HAIR, NO FEAR!\n\nVoice: a single, low-pitched synthesized male voice, deliberately spoken at an intelligible pace.\nInstrumentation: synth-generated, no third-party music recordings.\n''',encoding='utf-8')
+(OUT/'Bald_Boss_80s_Deep_Lyrics.txt').write_text('''BALD BOSS — NO HAIR, NO FEAR!\nOriginal 80s arena rock mix\n\nVERSE\nMirror, mirror, clear the way\nEvery hair has had its day\nClippers buzzing, feel the power\nTime to shine, this is the hour\nRaise your razors, make it clear\nThe shiny legend now is here\n\nCHORUS\nNO HAIR! NO FEAR!\nBALD BOSS IS HERE!\nSHAVE IT OFF! MAKE IT CLEAR!\nSHINY HEADS, WE CHEER!\n\n[Guitar-style solo]\n\nCHORUS [repeat]\nNO HAIR! NO FEAR!\nBALD BOSS IS HERE!\nSHAVE IT OFF! MAKE IT CLEAR!\nSHINY HEADS, WE CHEER!\n\nOUTRO\nBALD BOSS!\nNO HAIR, NO FEAR!\n\nVoice: one expressive Piper neural male voice with rhythmic spoken-rock delivery, natural inflection, dynamic emphasis and quiet studio echo. Not a human singer.\nInstrumentation: synth-generated, no third-party music recordings.\n''',encoding='utf-8')
 print('Completed ',round(len(full)/SR,2),'seconds')
 for p in sorted(OUT.glob('Bald_Boss_80s_Deep_*')):
     print(p.name, round(p.stat().st_size/1024,1),'KiB')
