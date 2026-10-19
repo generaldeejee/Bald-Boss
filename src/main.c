@@ -472,7 +472,7 @@ static void update(void){
  if(clipper_active)shave_at_cursor();
  if(shave_flash)shave_flash--;
  play_frames++;
- if(play_frames>=90*60){phase=3;clipper_active=0;}
+ if(play_frames>=90*60 && phase==1){phase=3;clipper_active=0;}
 }
 
 /* Original generative chiptune: no audio files, no licensed samples.
