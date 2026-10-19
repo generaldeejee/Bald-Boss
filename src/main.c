@@ -1,4 +1,4 @@
-/* Bald Boss 3D - PSP Edition v0.8.0 new anatomical head, UV texture and crown pitch controls barber UI, restart and finish camera with Deep Voice soundtrack. Original homebrew source.
+/* Bald Boss 3D - PSP Edition v0.8.1 tactile shaving new anatomical head, UV texture and crown pitch controls barber UI, restart and finish camera with Deep Voice soundtrack. Original homebrew source.
    Uses PSPSDK GU/GUM hardware 3D renderer. No PS1 BIOS calls. */
 #include <pspkernel.h>
 #include <pspctrl.h>
@@ -33,6 +33,7 @@ PSP_MAIN_THREAD_ATTR(THREAD_ATTR_USER | THREAD_ATTR_VFPU);
 #define MAX_HEAD_VERTS 11000
 #define HUD_QUADS 4096 /* font is now drawn using reliable solid-color sprite rectangles */
 #define BG_QUADS 768
+#define SHAVING_FX 72
 #define CLAMP(x,a,b) ((x)<(a)?(a):((x)>(b)?(b):(x)))
 #define C(r,g,b) (0xff000000u | ((unsigned)(b)<<16) | ((unsigned)(g)<<8) | (unsigned)(r))
 
@@ -47,6 +48,7 @@ typedef struct {float nx,ny,nz, x,y,z;} LitVertex;
 typedef struct {float x,y,z;} PosVertex;
 typedef struct {unsigned int color;float x,y,z;} UiVertex;
 typedef struct {float x,y,z,nx,ny,nz,tx,ty,tz,length;unsigned char gone;} Hair;
+typedef struct {float x,y,vx,vy;unsigned char age,life,kind;} ShavingParticle;
 
 static TexturedVertex __attribute__((aligned(16))) head[MAX_HEAD_VERTS];
 static int n_head=0;
@@ -76,6 +78,12 @@ static int finish_zoom_override=0;
 static int restart_grace=0;
 static int cleanup_bonus_given=0;
 static int cleanup_bonus_flash=0;
+static ShavingParticle shavings[SHAVING_FX];
+static int shaving_fx_index=0;
+static float last_shave_x=240.0f,last_shave_y=130.0f;
+static int last_shave_valid=0;
+static int clean_sweep_flash=0,clean_sweep_hits=0,clean_sweep_frame=-100;
+static volatile int cut_audio_pulse=0;
 static float current_camera_distance=CAM_DISTANCE;
 static float zoom_camera_distance(void){return current_camera_distance;}
 static float target_camera_distance(void){
@@ -400,6 +408,45 @@ static void draw_last_hair_markers(void){
     ui_box(x+5,y+5,3,3,col);
   }
 }
+/* Lightweight clipping particles; positioned in PSP screen space. */
+static void spawn_shavings(float x,float y,int amount){
+  int count=CLAMP(amount,1,3);
+  for(int j=0;j<count;j++){
+    ShavingParticle *p=&shavings[shaving_fx_index];
+    shaving_fx_index=(shaving_fx_index+1)%SHAVING_FX;
+    p->x=x+(rand01()-.5f)*11.0f;
+    p->y=y+(rand01()-.5f)*7.0f;
+    p->vx=(rand01()-.5f)*2.6f;
+    p->vy=-.75f-rand01()*1.5f;
+    p->life=(unsigned char)(20+(int)(rand01()*16.0f));
+    p->age=0;
+    p->kind=(unsigned char)(rand01()*3.0f);
+  }
+}
+static void update_shavings(void){
+  if(phase!=1||paused)return;
+  for(int i=0;i<SHAVING_FX;i++){
+    ShavingParticle *p=&shavings[i];
+    if(p->age>=p->life)continue;
+    p->age++;
+    p->x+=p->vx;
+    p->y+=p->vy;
+    p->vy+=.19f;
+  }
+  if(clean_sweep_flash>0)clean_sweep_flash--;
+}
+static void draw_shavings(void){
+  for(int i=0;i<SHAVING_FX;i++){
+    ShavingParticle *p=&shavings[i];
+    if(p->age>=p->life)continue;
+    int x=(int)p->x,y=(int)p->y;
+    if(x<12||x>SW-12||y<48||y>215)continue;
+    unsigned col=p->age*2<p->life?
+      (p->kind==0?C(88,55,43):C(128,85,57)):C(181,139,105);
+    ui_box(x,y,2,4,col);
+    ui_box(x+1,y+3,3,1,col);
+  }
+}
 static void draw_ui(void){
   n_hud=0;
   ui_box(0,0,SW,44,C(10,17,26));
@@ -474,6 +521,14 @@ static void draw_ui(void){
     if(phase!=1 && frame%90>45)ui_text(192,202,"X TO RESTART",1.15f);
     if(phase==1 && !paused){
       draw_last_hair_markers();
+      draw_shavings();
+      if(clean_sweep_flash>0 && n_hairs-removed>12){
+        char sweep_label[36];
+        snprintf(sweep_label,sizeof(sweep_label),"CLEAN SWEEP +%d",clean_sweep_hits*20);
+        ui_box(14,54,165,22,C(13,27,37));
+        ui_box(14,54,3,22,C(77,204,168));
+        ui_text(21,61,sweep_label,.95f);
+      }
       int cx=(int)cursor_x,cy=(int)cursor_y;
       ui_box(cx-9,cy-27,18,28,C(35,45,59));
       ui_box(cx-8,cy-29,16,6,C(189,199,206));
@@ -570,6 +625,9 @@ static void reset_game(void){
   removed=0;score=0;play_frames=0;cursor_x=240;cursor_y=130;
   yaw=0;pitch=0;shave_flash=0;phase=1;paused=0;pause_choice=0;
   cleanup_bonus_given=0;cleanup_bonus_flash=0;
+  memset(shavings,0,sizeof(shavings));shaving_fx_index=0;
+  clean_sweep_flash=0;clean_sweep_hits=0;clean_sweep_frame=-100;
+  last_shave_valid=0;cut_audio_pulse=0;
   zoom_level=0;finish_zoom_override=0;current_camera_distance=CAM_DISTANCE;
   clipper_active=0;restart_grace=10;stop_voice_pending=1;
   win_voice_pending=0;
@@ -578,6 +636,9 @@ static void return_to_title(void){
   for(int i=0;i<n_hairs;i++)hairs[i].gone=0;
   removed=0;score=0;play_frames=0;cursor_x=240;cursor_y=130;
   yaw=0;pitch=0;shave_flash=0;phase=0;paused=0;pause_choice=0;
+  memset(shavings,0,sizeof(shavings));shaving_fx_index=0;
+  clean_sweep_flash=0;clean_sweep_hits=0;clean_sweep_frame=-100;
+  last_shave_valid=0;cut_audio_pulse=0;
   zoom_level=0;finish_zoom_override=0;current_camera_distance=CAM_DISTANCE;
   clipper_active=0;restart_grace=0;stop_voice_pending=1;
   win_voice_pending=0;
@@ -585,6 +646,13 @@ static void return_to_title(void){
 static void shave_at_cursor(void){
   const float camera=zoom_camera_distance();
   int hit=0;
+  /* A clipper sweep includes the segment travelled since the prior frame. */
+  float x0=last_shave_valid?last_shave_x:cursor_x;
+  float y0=last_shave_valid?last_shave_y:cursor_y;
+  float dx=cursor_x-x0,dy=cursor_y-y0;
+  if(dx*dx+dy*dy>75.0f*75.0f){x0=cursor_x;y0=cursor_y;}
+  float vx=(cursor_x-x0)/19.0f,vy=(cursor_y-y0)/22.0f;
+  float denom=vx*vx+vy*vy;
   for(int i=0;i<n_hairs;i++){
     Hair *h=&hairs[i];if(h->gone)continue;
     float xx,yy,zz,face;
@@ -593,23 +661,32 @@ static void shave_at_cursor(void){
     float inv=1.0f/(camera-zz);
     float sx=240.0f+FOCAL_PIXELS*xx*inv;
     float sy=136.0f-FOCAL_PIXELS*(yy+CAM_Y)*inv;
-    if(fsq((sx-cursor_x)/17.0f)+fsq((sy-cursor_y)/20.0f)<1.0f){
+    float px=(x0-sx)/19.0f,py=(y0-sy)/22.0f;
+    float t=denom>.00001f?CLAMP(-(px*vx+py*vy)/denom,0.0f,1.0f):0.0f;
+    float ex=px+t*vx,ey=py+t*vy;
+    if(ex*ex+ey*ey<1.0f){
       h->gone=1;removed++;score+=20;hit++;
+      if(hit<=8)spawn_shavings(sx,sy,hit<3?2:1);
     }
   }
-  if(hit)shave_flash=7;
+  last_shave_x=cursor_x;last_shave_y=cursor_y;last_shave_valid=1;
+  if(hit){
+    shave_flash=7;
+    cut_audio_pulse=3400;
+    if(frame-clean_sweep_frame>24)clean_sweep_hits=0;
+    clean_sweep_frame=frame;
+    clean_sweep_hits=CLAMP(clean_sweep_hits+hit,0,999);
+    clean_sweep_flash=24;
+  }
   if(!cleanup_bonus_given && n_hairs-removed<=10 && n_hairs-removed>0){
     cleanup_bonus_given=1;
     play_frames=play_frames>30*60?play_frames-30*60:0;
     cleanup_bonus_flash=150;
   }
   if(removed>=n_hairs && n_hairs>0 && phase==1){
-    phase=2;
-    clipper_active=0;
-    win_voice_pending=1; /* Announce a fully shaved head just once. */
+    phase=2;clipper_active=0;win_voice_pending=1;
   }
-}
-/* Final-hair locator: orient the head to a remaining strand and aim the
+}/* Final-hair locator: orient the head to a remaining strand and aim the
    clippers at it. Off-screen inaccessible hairs are automatically cleared. */
 static void locate_final_hair(void){
   if(phase!=1 || n_hairs-removed>3)return;
@@ -645,7 +722,7 @@ static void update(void){
    return;
  }
  if(just&PSP_CTRL_START){
-   if(!paused){paused=1;pause_choice=0;clipper_active=0;return;}
+   if(!paused){paused=1;pause_choice=0;clipper_active=0;last_shave_valid=0;return;}
    paused=0;clipper_active=0;return;
  }
  if(paused){
@@ -691,6 +768,8 @@ static void update(void){
  if(restart_grace>0){restart_grace--;clipper_active=0;}
  else clipper_active=(b&(PSP_CTRL_CROSS|PSP_CTRL_SQUARE))?1:0;
  if(clipper_active)shave_at_cursor();
+ else last_shave_valid=0;
+ update_shavings();
  if(shave_flash)shave_flash--;
  if(cleanup_bonus_flash>0)cleanup_bonus_flash--;
  if(n_hairs-removed>1)play_frames++; /* One last hair: unlimited cleanup time. */
@@ -736,6 +815,12 @@ static int audio_thread(SceSize args,void *argp){
    float clipper=(triangle_wave(motor_phase)*.17f+
        triangle_wave(motor2_phase)*.060f+
        ((noise>>24)/127.5f-1.0f)*.060f)*motor_env;
+   int cut=cut_audio_pulse;
+   if(cut>0){
+     cut_audio_pulse=cut-1;
+     clipper+=(triangle_wave(motor2_phase)*.075f+
+       ((noise>>24)/127.5f-1.0f)*.032f)*((float)cut/3400.0f);
+   }
    motor_phase+=107.0f/(float)AUDIO_RATE;
    motor2_phase+=221.5f/(float)AUDIO_RATE;
    if(motor_phase>=1.0f)motor_phase-=1.0f;
