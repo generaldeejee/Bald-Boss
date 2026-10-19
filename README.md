@@ -135,3 +135,14 @@ The full-resolution OGG/WAV tracks are intended for future Windows, Linux,
 macOS, and Android ports; this repository still builds the **PSP edition**, not
 yet a native desktop/mobile game. No actual PPSSPP playback validation has
 been performed for this music change.
+
+
+## PSP v0.8.0: Rebuilt head & crown shaving
+
+The earlier distorted imported head is replaced by a purpose-built original **CC0** low-poly head with a cylindrical UV atlas and a custom **256×256 RGB565** face texture. The game generates both once at startup from `src/bald_head_v2.h` (3,120 triangles, 9,360 unpacked draw vertices).
+
+**Controls:** Hold **L + D-pad Up** to tilt the head forward and shave the crown; **L + D-pad Down** tilts back. **L** by itself still rotates left, and **R** rotates right. D-pad/analog without L moves the clippers; X/Square shaves. The last-hair locator also adjusts vertical orientation.
+
+For editable assets, `tools/export_bald_head.c` outputs a Wavefront OBJ with UVs and a matching PPM texture. Example: `gcc -O2 -std=c99 tools/export_bald_head.c -lm -o export_head && ./export_head`. The game uses that same C geometry generator at runtime. The two main sources of truth are `src/bald_head_v2.h` and `src/main.c`. Existing Deep Voice audio remains untouched.
+
+**Testing note:** The new mesh exporter and host C syntax were checked locally, including simulated crown visibility during vertical rotation; PPSSPP/real PSP verification is still required.
