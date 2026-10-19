@@ -104,3 +104,34 @@ Bald Boss 3D game concept and source generated in collaboration with ChatGPT. Or
 De audiothread mengt de bestaande chiptune met een originele, programmatisch gemaakte tondeusebrom en een met de vrije eSpeak-synthesizer gemaakte Engelse stem. GitHub Actions genereert via \`tools/generate_voice.py\` eerst een PCM8-header en bouwt daarna \`EBOOT.PBP\`. Lokaal bouwen: installeer eSpeak, voer \`python3 tools/generate_voice.py\` uit en daarna \`make\` met PSPDEV.
 
 De code heeft lokale host-syntax- en gameplaytests doorstaan. De werkelijke PSPDEV-build en PPSSPP-weergave moeten nog worden gecontroleerd.
+
+## v0.7 - Deep Voice Edition soundtrack
+
+The complete **No Hair, No Fear! (Deep Voice Edition)** song now plays on the
+title screen and on the win/timeout results screens. During the 90-second
+shave challenge, a matching **instrumental** plays instead. Starting a new
+round automatically switches music. **SELECT** still toggles music only,
+while the clipper motor and **"Another bald boss!"** announcer remain audible.
+
+The full song and instrumental are **original, AI-assisted compositions** made
+with procedural synthesizers and offline free eSpeak vocals. The vocals are a
+single slow, low synthetic male voice (not a human performance). No Suno assets
+or third-party recordings are included.
+
+### Build details
+
+GitHub Actions runs `tools/generate_psp_music.py`, which reproduces the exact
+deep-voice and instrumental mixes from the committed Python generators in
+`tools/music_sources/`, then embeds both as **11,025 Hz PCM8 mono** data in
+`src/music_samples.h`. This deliberately trades hi-fi quality for PSP
+compatibility and avoids an additional OGG decoder. The generated header is not
+versioned; it is included in the PSP build artifact automatically.
+
+For a local PSPDEV build, install Python 3, NumPy, SciPy, SoundFile, ffmpeg,
+and eSpeak; then run `python3 tools/generate_voice.py` and
+`python3 tools/generate_psp_music.py` before `make`.
+
+The full-resolution OGG/WAV tracks are intended for future Windows, Linux,
+macOS, and Android ports; this repository still builds the **PSP edition**, not
+yet a native desktop/mobile game. No actual PPSSPP playback validation has
+been performed for this music change.
