@@ -1,14 +1,23 @@
-# Bald Boss 3D — PSP Edition v0.9.0 (public beta candidate)
+# Bald Boss 3D — PSP Edition v0.9.1 (public beta candidate)
 
 **Bald Boss 3D** is an original, humorous, native PlayStation Portable (PSP) homebrew game: shave a rotating 3D head with an electric clipper, uncover the shiny scalp, and become a legendary Bald Boss.
 
+### The Elite Bald Man Club
+
+> **Only truly bald men may join. Shave these heads. Turn them into BALD BOSSES!**
+
+As the club's barber, your job is to transform hairy applicants into bona fide bald bosses. A perfect shave wins **MEMBERSHIP APPROVED!**; running out of time in Challenge Mode means **MEMBERSHIP DENIED!**. The original victory announcer still calls out **"Another bald boss!"**
+
+The project is still called **Bald Boss 3D**. *The Elite Bald Man Club* is the game's fictional setting and running joke.
+
 Built in C with the open-source PSPDEV/PSPSDK toolchain and PSP GU/GUM rendering. It is **not** a PS1 executable and needs **no PS1 BIOS**.
 
-## What's new in v0.9.0
+## What's new in v0.9.1
 
+- **Elite Bald Man Club theme (v0.9.1):** rewritten start-menu mission, club-themed tutorial, **Membership Approved** victory and **Membership Denied** timed-out results.
 - **90 Seconds Challenge:** the classic timed shave, with a 30-second cleanup bonus near the end and protection against losing to one inaccessible final hair.
 - **Zen Mode:** the same shaving, hair particles, sound effects and free rotation, but without a time limit. The clock tracks elapsed time.
-- **Victory celebration:** an automatic slow 360° head orbit to showcase your freshly polished scalp, a score, a one-to-three-star rating and the original **“Another bald boss!”** announcer.
+- **Victory celebration:** an automatic slow 360° head orbit to showcase your freshly polished scalp, a score, a one-to-three-star rating, a **Membership Approved** banner, and the original **“Another bald boss!”** announcer.
 - **In-game tutorial:** displayed on the first round; also accessible from the title screen with **Triangle**, or from **Pause → How to Play**.
 - Preserves the procedurally modeled 3D head, 256×256 textured skin, hair-finding help, dynamic scalp gloss, zoom, vertical head tilt and the original Deep Voice Edition soundtrack.
 
@@ -91,7 +100,7 @@ Before publishing a download on a homebrew site, verify:
 - [ ] Take genuine in-game screenshots and include them in a GitHub Release.
 - [ ] Publish a ZIP containing `PSP/GAME/BALDBOSS/EBOOT.PBP` with version, changelog and license.
 
-**Verification status:** Source-level integration checks have been performed for v0.9.0. A successful PSPDEV cross-compilation, PPSSPP playthrough of v0.9.0 and physical PSP testing still need confirmation. Do not label this build “fully tested on PSP” until it has been verified.
+**Verification status:** Source-level integration checks have been performed for v0.9.1. A successful PSPDEV cross-compilation, PPSSPP playthrough of v0.9.0 and physical PSP testing still need confirmation. Do not label this build “fully tested on PSP” until it has been verified.
 
 ## Reporting issues
 
