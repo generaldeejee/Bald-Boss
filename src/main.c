@@ -589,11 +589,12 @@ static void draw_ui(void){
       if(zen_mode)snprintf(result,sizeof(result),"ZEN COMPLETE  SCORE %d",score);
       else snprintf(result,sizeof(result),"SCORE %d  TIME %02d:%02d",score,play_frames/3600,(play_frames/60)%60);
       ui_text(108,198,result,1.05f);
+      ui_text(343,198,"X REPLAY",.95f);
     }else if(phase==3){
       ui_box(104,168,272,42,C(10,16,27));
       ui_text(168,181,"TIME IS UP!",1.65f);
     }
-    if(phase!=1 && frame%90>45)ui_text(192,202,"X TO RESTART",1.15f);
+    if(phase==3 && frame%90>45)ui_text(192,202,"X TO RESTART",1.15f);
     if(phase==1 && !paused){
       draw_last_hair_markers();
       draw_shavings();
