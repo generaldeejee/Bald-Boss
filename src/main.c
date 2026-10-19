@@ -632,7 +632,11 @@ static void draw_shaved_scalp_gloss(void){
       float zz=nz*cy-h->nx*sy;
       /* Studio-style specular half-vector: upper-left key / camera. */
       float dot=CLAMP(nx*(-.24f)+ny*.57f+zz*.79f,0.0f,1.0f);
-      float highlight=powf(dot,16.0f);
+      /* Fourth squaring: dot^16 without expensive per-vertex powf(). */
+      float highlight=dot*dot;
+      highlight*=highlight;
+      highlight*=highlight;
+      highlight*=highlight;
       int alpha=CLAMP((int)(shaved*highlight*76.0f),0,76);
       unsigned color=((unsigned)alpha<<24)|(218u<<16)|(241u<<8)|255u;
       buf[count++]=(GlossVertex){color,
