@@ -1,4 +1,4 @@
-/* Bald Boss 3D - PSP Edition v0.6.3 OBJ head + more realistic UV face texture. Original homebrew source.
+/* Bald Boss 3D - PSP Edition v0.6.5 Clipper FX, camera zoom, win announcer. Original homebrew source.
    Uses PSPSDK GU/GUM hardware 3D renderer. No PS1 BIOS calls. */
 #include <pspkernel.h>
 #include <pspctrl.h>
@@ -41,6 +41,7 @@ static unsigned short __attribute__((aligned(16))) skin_tex[128*128];
 typedef struct {float u,v, nx,ny,nz, x,y,z;} TexturedVertex;
 #include "head_model.h"
 #include "head_texture.h"
+#include "voice_sample.h"
 typedef struct {float nx,ny,nz, x,y,z;} LitVertex;
 typedef struct {float x,y,z;} PosVertex;
 typedef struct {unsigned int color;float x,y,z;} UiVertex;
@@ -64,6 +65,15 @@ static unsigned int prev_buttons=0;
 static unsigned int rand_seed=0xB01D2026u;
 static int shave_flash=0;
 static int shades_on=0;
+/* Zoom and hit-testing use precisely the same dynamic camera distance. */
+static int zoom_level=0;
+static float zoom_camera_distance(void){
+ static const float distances[3]={CAM_DISTANCE,4.20f,3.20f};
+ return distances[zoom_level];
+}
+static volatile int clipper_active=0;
+static volatile int win_voice_pending=0;
+static volatile int stop_voice_pending=0;
 static volatile int music_enabled=1;
 static int audio_channel=-1;
 static short __attribute__((aligned(64))) audio_pcm[2][AUDIO_SAMPLES*2];
@@ -228,7 +238,7 @@ static void make_beard_stubble(void){
 }
 static void draw_beard_stubble(void){
  sceGuDisable(GU_TEXTURE_2D);sceGuDisable(GU_LIGHTING);
- sceGuColor(C(108,76,65));
+ sceGuColor(C(96,72,61));
  sceGumDrawArray(GU_TRIANGLES,GU_VERTEX_32BITF|GU_TRANSFORM_3D,n_beard_stubble,0,beard_stubble);
  sceGuEnable(GU_LIGHTING);
 }
@@ -252,7 +262,7 @@ static void draw_hair(void){
   }
   sceGuDisable(GU_TEXTURE_2D);
   sceGuDisable(GU_LIGHTING);
-  sceGuColor(C(41,29,25));
+  sceGuColor(C(46,32,28));
   PosVertex *hair_copy=(PosVertex*)sceGuGetMemory((size_t)n_hair_verts*sizeof(PosVertex));
   memcpy(hair_copy,hair_mesh,(size_t)n_hair_verts*sizeof(PosVertex));
   sceGumDrawArray(GU_TRIANGLES,GU_VERTEX_32BITF|GU_TRANSFORM_3D,n_hair_verts,0,hair_copy);
@@ -303,6 +313,10 @@ static void draw_ui(void){
   ui_text(13,9,"BALD BOSS",2.1f);
   ui_text(178,14,phase==0?"THE FINAL HAIRCUT":"PSP EDITION",1.05f);
   ui_text(394,13,music_enabled?"MUSIC ON":"MUSIC OFF",.98f);
+  if(phase!=0){
+    const char *z=zoom_level==0?"ZOOM 1X":(zoom_level==1?"ZOOM 1.4X":"ZOOM 1.8X");
+    ui_text(298,15,z,1.0f);
+  }
 
   if(phase==0){
     /* A dedicated intro panel sits beside the smaller rotating portrait. */
@@ -315,7 +329,7 @@ static void draw_ui(void){
     ui_text(252,160,"WELCOME HERE.",.90f);
     ui_text(263,187,"PRESS X TO START",1.28f);
     ui_text(18,229,"NO WIGS. NO FEAR. JUST BALDNESS.",1.02f);
-    ui_text(19,252,"L/R TURN   TRI SHADES   SELECT MUSIC",.89f);
+    ui_text(19,252,"L/R TURN  O ZOOM  TRI SHADES  SELECT MUSIC",.89f);
   } else {
     ui_box(14,233,110,6,C(43,56,67));
     ui_box(14,233,(110*removed)/(n_hairs?n_hairs:1),6,C(61,222,171));
@@ -366,17 +380,20 @@ static void render_head(void){
   /* Smaller portrait on the title screen makes room for the introduction. */
   ScePspFVector3 pos={phase==0?-1.15f:0.0f,
                       phase==0?0.06f:CAM_Y,
-                      phase==0?-7.40f:-CAM_DISTANCE};
+                      phase==0?-7.40f:-zoom_camera_distance()};
   sceGumTranslate(&pos);
   ScePspFVector3 rot={0,yaw,0};sceGumRotateXYZ(&rot);
   sceGuEnable(GU_DEPTH_TEST);sceGuDepthMask(GU_FALSE);
-  sceGuEnable(GU_LIGHTING);sceGuEnable(GU_LIGHT0);
-  ScePspFVector3 sun={-0.40f,0.55f,0.74f};
+  sceGuEnable(GU_LIGHTING);sceGuEnable(GU_LIGHT0);sceGuEnable(GU_LIGHT1);
+  ScePspFVector3 sun={-0.34f,0.72f,0.61f};
+  ScePspFVector3 fill={0.52f,0.16f,0.84f};
   sceGuLight(0,GU_DIRECTIONAL,GU_DIFFUSE,&sun);
-  sceGuLightColor(0,GU_DIFFUSE,0x00efe6dc);
-  sceGuAmbient(0x0033404c);
-  sceGuMaterial(GU_AMBIENT,0xff9b755f);
-  sceGuMaterial(GU_DIFFUSE,0xfff1c8a8);
+  sceGuLightColor(0,GU_DIFFUSE,0x00fff0e2);
+  sceGuLight(1,GU_DIRECTIONAL,GU_DIFFUSE,&fill);
+  sceGuLightColor(1,GU_DIFFUSE,0x005d7084);
+  sceGuAmbient(0x00404b58);
+  sceGuMaterial(GU_AMBIENT,0xffa07a62);
+  sceGuMaterial(GU_DIFFUSE,0xfff4ccb0);
   sceGuAmbientColor(0xffffffff);
   sceGuEnable(GU_TEXTURE_2D);
   sceGuTexMode(GU_PSM_5650,0,0,0);
@@ -398,9 +415,12 @@ static void reset_game(void){
   for(int i=0;i<n_hairs;i++)hairs[i].gone=0;
   removed=0;score=0;play_frames=0;cursor_x=240;cursor_y=130;
   yaw=0;shave_flash=0;phase=1;
+  zoom_level=0;clipper_active=0;stop_voice_pending=1;
+  win_voice_pending=0;
 }
 static void shave_at_cursor(void){
   float s=sinf(yaw),c=cosf(yaw);
+  const float camera=zoom_camera_distance();
   int hit=0;
   for(int i=0;i<n_hairs;i++){
     Hair *h=&hairs[i];if(h->gone)continue;
@@ -409,7 +429,7 @@ static void shave_at_cursor(void){
     float face=h->nz*c-h->nx*s;
     if(face<0.13f)continue; /* Never shave hidden back-side hair. */
     /* Camera and hit-testing share exactly the same perspective model. */
-    float inv=1.0f/(CAM_DISTANCE-zz);
+    float inv=1.0f/(camera-zz);
     float sx=240.0f+FOCAL_PIXELS*xx*inv;
     float sy=136.0f-FOCAL_PIXELS*(h->y+CAM_Y)*inv;
     if(fsq((sx-cursor_x)/17.0f)+fsq((sy-cursor_y)/20.0f)<1.0f){
@@ -417,7 +437,11 @@ static void shave_at_cursor(void){
     }
   }
   if(hit)shave_flash=7;
-  if(removed>=n_hairs && n_hairs>0)phase=2;
+  if(removed>=n_hairs && n_hairs>0 && phase==1){
+    phase=2;
+    clipper_active=0;
+    win_voice_pending=1;
+  }
 }
 static void update(void){
  SceCtrlData pad;
@@ -426,7 +450,9 @@ static void update(void){
  /* These toggles work in menus and while playing. */
  if(just&PSP_CTRL_TRIANGLE)shades_on=!shades_on;
  if(just&PSP_CTRL_SELECT)music_enabled=!music_enabled;
+ if(just&PSP_CTRL_CIRCLE && phase==1)zoom_level=(zoom_level+1)%3;
  if(phase!=1){
+   clipper_active=0;
    if(just&PSP_CTRL_CROSS)reset_game();
    else if(phase==0)yaw=0.10f*sinf((float)frame*0.010f);
    return;
@@ -442,10 +468,11 @@ static void update(void){
  if(pad.Lx>146||pad.Lx<110)cursor_x+=((int)pad.Lx-128)/35.0f;
  if(pad.Ly>146||pad.Ly<110)cursor_y+=((int)pad.Ly-128)/35.0f;
  cursor_x=CLAMP(cursor_x,35,445);cursor_y=CLAMP(cursor_y,60,207);
- if(b&(PSP_CTRL_CROSS|PSP_CTRL_SQUARE))shave_at_cursor();
+ clipper_active=(b&(PSP_CTRL_CROSS|PSP_CTRL_SQUARE))?1:0;
+ if(clipper_active)shave_at_cursor();
  if(shave_flash)shave_flash--;
  play_frames++;
- if(play_frames>=90*60)phase=3;
+ if(play_frames>=90*60){phase=3;clipper_active=0;}
 }
 
 /* Original generative chiptune: no audio files, no licensed samples.
@@ -458,17 +485,22 @@ static const unsigned char melody_notes[32]={
 static const unsigned char bass_notes[8]={48,48,53,53,45,50,48,48};
 static float midi_hz(int midi){return 440.0f*powf(2.0f,(midi-69)/12.0f);}
 static float triangle_wave(float phase){return 1.0f-4.0f*fabsf(phase-0.5f);}
+/* The clipper motor is procedural, and the prerecorded synthesized
+   announcement is 11.025 kHz PCM8 mixed with the existing PSP chiptune. */
 static int audio_thread(SceSize args,void *argp){
  (void)args;(void)argp;
  int ch=sceAudioChReserve(PSP_AUDIO_NEXT_CHANNEL,AUDIO_SAMPLES,PSP_AUDIO_FORMAT_STEREO);
  if(ch<0)return 0;
  audio_channel=ch;
  float melody_phase=0.0f,bass_phase=0.0f,chord_phase=0.0f;
- int step=0,within_step=0,bufno=0;
+ float motor_phase=0.0f,motor2_phase=0.0f,motor_env=0.0f;
+ int step=0,within_step=0,bufno=0,voice_sample_pos=-1;
  float mel_hz=midi_hz(72),bass_hz=midi_hz(48),chord_hz=midi_hz(60);
  unsigned int noise=0x159e1u;
  while(1){
   short *buf=audio_pcm[bufno];
+  if(stop_voice_pending){voice_sample_pos=-1;stop_voice_pending=0;}
+  if(win_voice_pending){voice_sample_pos=0;win_voice_pending=0;}
   for(int i=0;i<AUDIO_SAMPLES;i++){
    if(within_step==0){
      mel_hz=melody_notes[step]?midi_hz(melody_notes[step]):0.0f;
@@ -482,14 +514,35 @@ static int audio_thread(SceSize args,void *argp){
    noise=noise*1664525u+1013904223u;
    float beat=(within_step<1350 && (step%2)==0)
       ?(1.0f-(float)within_step/1350.0f)*((noise&65535)/32768.0f-1.0f)*.070f:0.0f;
-   float s=CLAMP(melody+bass+chord+beat,-.87f,.87f);
-   short pcm=music_enabled?(short)(s*14500.0f):0;
+   float target=clipper_active?1.0f:0.0f;
+   motor_env+=(target-motor_env)*.0034f;
+   float clipper=(triangle_wave(motor_phase)*.17f+
+       triangle_wave(motor2_phase)*.060f+
+       ((noise>>24)/127.5f-1.0f)*.060f)*motor_env;
+   motor_phase+=107.0f/(float)AUDIO_RATE;
+   motor2_phase+=221.5f/(float)AUDIO_RATE;
+   if(motor_phase>=1.0f)motor_phase-=1.0f;
+   if(motor2_phase>=1.0f)motor2_phase-=1.0f;
+   float voice=0.0f;
+   if(voice_sample_pos>=0){
+      int k=voice_sample_pos>>2;
+      if(k>=VOICE_SAMPLE_LEN)voice_sample_pos=-1;
+      else{
+        float v0=((int)voice_sample[k]-128)/128.0f;
+        float v1=((int)voice_sample[k+1<VOICE_SAMPLE_LEN?k+1:k]-128)/128.0f;
+        voice=(v0+(v1-v0)*(float)(voice_sample_pos&3)*.25f)*.65f;
+        voice_sample_pos++;
+      }
+   }
+   float music_gain=voice_sample_pos>=0?.22f:(motor_env>.02f?.48f:1.0f);
+   float sound=(music_enabled?(melody+bass+chord+beat)*music_gain:0.0f)+clipper+voice;
+   sound=CLAMP(sound,-.96f,.96f);
+   short pcm=(short)(sound*22000.0f);
    buf[i*2]=pcm;buf[i*2+1]=pcm;
-   melody_phase+=mel_hz/AUDIO_RATE; if(melody_phase>=1.0f)melody_phase-=1.0f;
-   bass_phase+=bass_hz/AUDIO_RATE; if(bass_phase>=1.0f)bass_phase-=1.0f;
-   chord_phase+=chord_hz/AUDIO_RATE; if(chord_phase>=1.0f)chord_phase-=1.0f;
-   within_step++;
-   if(within_step>=MUSIC_STEP_SAMPLES){within_step=0;step=(step+1)%32;}
+   melody_phase+=mel_hz/AUDIO_RATE;if(melody_phase>=1.0f)melody_phase-=1.0f;
+   bass_phase+=bass_hz/AUDIO_RATE;if(bass_phase>=1.0f)bass_phase-=1.0f;
+   chord_phase+=chord_hz/AUDIO_RATE;if(chord_phase>=1.0f)chord_phase-=1.0f;
+   within_step++;if(within_step>=MUSIC_STEP_SAMPLES){within_step=0;step=(step+1)%32;}
   }
   sceKernelDcacheWritebackRange(buf,AUDIO_SAMPLES*2*sizeof(short));
   if(sceAudioOutputBlocking(ch,PSP_AUDIO_VOLUME_MAX,buf)<0)break;
@@ -498,6 +551,7 @@ static int audio_thread(SceSize args,void *argp){
  sceAudioChRelease(ch);audio_channel=-1;
  return 0;
 }
+
 static void start_music(void){
  int th=sceKernelCreateThread("bald_boss_music",audio_thread,0x18,0x2000,0,NULL);
  if(th>=0)sceKernelStartThread(th,0,NULL);
