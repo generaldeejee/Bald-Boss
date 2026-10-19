@@ -1,4 +1,4 @@
-/* Bald Boss 3D - PSP Edition v0.7 Deep Voice soundtrack, clippers, zoom. Original homebrew source.
+/* Bald Boss 3D - PSP Edition v0.7.0 barber UI, restart and finish camera with Deep Voice soundtrack. Original homebrew source.
    Uses PSPSDK GU/GUM hardware 3D renderer. No PS1 BIOS calls. */
 #include <pspkernel.h>
 #include <pspctrl.h>
@@ -32,6 +32,7 @@ PSP_MAIN_THREAD_ATTR(THREAD_ATTR_USER | THREAD_ATTR_VFPU);
 #define MAX_HAIR_VERTS (HAIRS*6)
 #define MAX_HEAD_VERTS 11000
 #define HUD_QUADS 4096 /* font is now drawn using reliable solid-color sprite rectangles */
+#define BG_QUADS 768
 #define CLAMP(x,a,b) ((x)<(a)?(a):((x)>(b)?(b):(x)))
 #define C(r,g,b) (0xff000000u | ((unsigned)(b)<<16) | ((unsigned)(g)<<8) | (unsigned)(r))
 
@@ -58,6 +59,8 @@ static int n_beard_stubble=0;
 static int n_hair_verts=0;
 static UiVertex __attribute__((aligned(16))) hud[HUD_QUADS*2];
 static int n_hud=0;
+static UiVertex __attribute__((aligned(16))) bg[BG_QUADS*2];
+static int n_bg=0;
 static Hair hairs[HAIRS];
 static int n_hairs=0, removed=0, score=0;
 static int phase=0,frame=0, play_frames=0;
@@ -66,11 +69,25 @@ static unsigned int prev_buttons=0;
 static unsigned int rand_seed=0xB01D2026u;
 static int shave_flash=0;
 static int shades_on=0;
-/* Zoom and hit-testing use precisely the same dynamic camera distance. */
-static int zoom_level=0;
-static float zoom_camera_distance(void){
- static const float distances[3]={CAM_DISTANCE,4.20f,3.20f};
- return distances[zoom_level];
+/* Renders and hair hit-testing must use the SAME perspective distance. */
+static int zoom_level=0; /* 0: normal, 1: 1.4x, 2: 1.8x (approximately) */
+static int paused=0;
+static int pause_choice=0; /* 0 resume; 1 restart; 2 return to title */
+static int finish_zoom_override=0;
+static int restart_grace=0;
+static float current_camera_distance=CAM_DISTANCE;
+static float zoom_camera_distance(void){return current_camera_distance;}
+static float target_camera_distance(void){
+  static const float d[3]={CAM_DISTANCE,4.20f,3.20f};
+  int remaining=n_hairs-removed;
+  if(phase==1 && remaining>0 && remaining<=12 && !finish_zoom_override)
+    return remaining<=5?2.95f:3.25f;
+  return d[zoom_level];
+}
+static void update_camera_zoom(void){
+  float target=target_camera_distance();
+  current_camera_distance+=(target-current_camera_distance)*0.12f;
+  if(fabsf(target-current_camera_distance)<0.005f)current_camera_distance=target;
 }
 static volatile int clipper_active=0;
 static volatile int win_voice_pending=0;
@@ -245,8 +262,10 @@ static void draw_beard_stubble(void){
 }
 
 static void hair_vertices(PosVertex *dst,Hair *h,int variant){
-  float thickness=(variant==0)?.0060f:.0035f;
-  float len=h->length*(variant==0?1.0f:0.72f);
+  int remaining=n_hairs-removed;
+  float visibility=(remaining<=10)?1.95f:((remaining<=24)?1.55f:((remaining<=40)?1.24f:1.0f));
+  float thickness=((variant==0)?.0060f:.0035f)*visibility;
+  float len=h->length*(variant==0?1.0f:0.72f)*((remaining<=10)?1.20f:((remaining<=24)?1.10f:1.0f));
   float lean=(variant==0)?.010f:-.008f;
   float bx=h->x+h->nx*.011f,by=h->y+h->ny*.011f,bz=h->z+h->nz*.011f;
   dst[0]=(PosVertex){bx+h->tx*thickness,by,bz+h->tz*thickness};
@@ -255,6 +274,7 @@ static void hair_vertices(PosVertex *dst,Hair *h,int variant){
 }
 static void draw_hair(void){
   n_hair_verts=0;
+  int remaining=n_hairs-removed;
   /* Cache all live hairs in one GPU draw call, 2 triangles per tuft. */
   for(int i=0;i<n_hairs;i++)if(!hairs[i].gone){
     if(n_hair_verts+6>MAX_HAIR_VERTS)break;
@@ -263,7 +283,10 @@ static void draw_hair(void){
   }
   sceGuDisable(GU_TEXTURE_2D);
   sceGuDisable(GU_LIGHTING);
-  sceGuColor(C(46,32,28));
+  if(remaining<=10)sceGuColor((frame/12)%2?C(255,250,120):C(255,120,64));
+  else if(remaining<=24)sceGuColor(C(255,225,120));
+  else if(remaining<=40)sceGuColor(C(92,64,52));
+  else sceGuColor(C(46,32,28));
   PosVertex *hair_copy=(PosVertex*)sceGuGetMemory((size_t)n_hair_verts*sizeof(PosVertex));
   memcpy(hair_copy,hair_mesh,(size_t)n_hair_verts*sizeof(PosVertex));
   sceGumDrawArray(GU_TRIANGLES,GU_VERTEX_32BITF|GU_TRANSFORM_3D,n_hair_verts,0,hair_copy);
@@ -274,6 +297,43 @@ static void ui_box(int x,int y,int w,int h,unsigned int color){
  if(n_hud+2>HUD_QUADS*2)return;
  hud[n_hud++]=(UiVertex){color,(float)x,(float)y,0.0f};
  hud[n_hud++]=(UiVertex){color,(float)(x+w),(float)(y+h),0.0f};
+}
+static void bg_box(int x,int y,int w,int h,unsigned int color){
+ if(n_bg+2>BG_QUADS*2)return;
+ bg[n_bg++]=(UiVertex){color,(float)x,(float)y,0.0f};
+ bg[n_bg++]=(UiVertex){color,(float)(x+w),(float)(y+h),0.0f};
+}
+static void draw_backdrop(void){
+ n_bg=0;
+ bg_box(0,0,SW,218,C(18,29,40));
+ bg_box(0,218,SW,54,C(27,31,36));
+ for(int x=0;x<SW;x+=40) bg_box(x,43,20,174,((x/40)&1)?C(17,36,60):C(13,24,43));
+ bg_box(32,55,416,145,C(9,19,34));
+ bg_box(36,59,408,137,C(17,32,52));
+ bg_box(52,76,376,102,phase==0?C(24,40,64):C(20,34,56));
+ bg_box(58,82,364,90,C(22,38,62));
+ for(int y=0;y<90;y+=18)bg_box(58,82+y,364,2,C(31,51,80));
+ for(int side=0;side<2;side++){
+   int px=side?429:35;
+   bg_box(px,70,14,120,C(224,230,232));
+   for(int y=66;y<194;y+=16){
+     bg_box(px,y+((side?8:0)),14,8,C(181,48,62));
+     bg_box(px,y+8,14,8,C(53,132,188));
+   }
+   bg_box(px-2,66,18,4,C(205,177,96));
+   bg_box(px-2,190,18,4,C(205,177,96));
+ }
+ for(int y=218;y<272;y+=18)for(int x=0;x<SW;x+=24)
+   bg_box(x,y,12,9,(((x+y)/18)&1)?C(40,45,52):C(28,32,39));
+ if(phase==0){
+   bg_box(250,60,178,24,C(76,40,28));
+   bg_box(252,62,174,20,C(109,63,45));
+   bg_box(258,67,162,10,C(133,84,64));
+ }
+ sceKernelDcacheWritebackAll();
+ sceGuDisable(GU_LIGHTING);sceGuDisable(GU_DEPTH_TEST);
+ sceGuDisable(GU_TEXTURE_2D);sceGuDisable(GU_BLEND);
+ sceGuDrawArray(GU_SPRITES,GU_COLOR_8888|GU_VERTEX_32BITF|GU_TRANSFORM_2D,n_bg,0,bg);
 }
 /* Rasterize the existing 5x7 font as opaque GU_SPRITES rectangles.
    The prior HUD used normalized 0..1 UVs with PSP's pixel-space texture
@@ -305,48 +365,93 @@ static void ui_text(float x,float y,const char *s,float scale){
  }
 }
 
+static int project_hair_screen(const Hair *h,float *sx,float *sy){
+  float s=sinf(yaw),c=cosf(yaw);
+  const float camera=zoom_camera_distance();
+  float zz=h->z*c-h->x*s;
+  float xx=h->x*c+h->z*s;
+  float face=h->nz*c-h->nx*s;
+  if(face<0.13f)return 0;
+  float inv=1.0f/(camera-zz);
+  *sx=240.0f+FOCAL_PIXELS*xx*inv;
+  *sy=136.0f-FOCAL_PIXELS*(h->y+CAM_Y)*inv;
+  return (*sx>=6 && *sx<SW-6 && *sy>=50 && *sy<218);
+}
+static void draw_last_hair_markers(void){
+  int remaining=n_hairs-removed;
+  if(remaining>12)return;
+  int blink=((frame/10)&1)==0;
+  for(int i=0;i<n_hairs;i++){
+    if(hairs[i].gone)continue;
+    float sx,sy;
+    if(!project_hair_screen(&hairs[i],&sx,&sy))continue;
+    int x=(int)sx,y=(int)sy;
+    unsigned int col=blink?C(255,235,90):C(255,122,70);
+    ui_box(x-6,y-1,12,2,col);
+    ui_box(x-1,y-6,2,12,col);
+    ui_box(x-8,y-8,3,3,col);
+    ui_box(x+5,y-8,3,3,col);
+    ui_box(x-8,y+5,3,3,col);
+    ui_box(x+5,y+5,3,3,col);
+  }
+}
 static void draw_ui(void){
   n_hud=0;
-  ui_box(0,0,SW,43,C(10,16,27));
-  ui_box(0,43,SW,2,C(64,184,179));
-  ui_box(0,218,SW,54,C(10,16,27));
-  ui_box(0,217,SW,1,C(67,136,142));
-  ui_text(13,9,"BALD BOSS",2.1f);
-  ui_text(178,14,phase==0?"THE FINAL HAIRCUT":"PSP EDITION",1.05f);
-  ui_text(394,13,music_enabled?"MUSIC ON":"MUSIC OFF",.98f);
+  ui_box(0,0,SW,44,C(10,17,26));
+  ui_box(0,42,SW,3,C(193,155,80));
+  ui_box(0,45,SW,2,C(57,126,139));
+  ui_box(0,217,SW,3,C(193,155,80));
+  ui_box(0,220,SW,52,C(10,17,26));
+  ui_box(0,269,SW,3,C(57,126,139));
+  ui_box(9,7,5,29,C(193,155,80));
+  ui_text(19,9,"BALD BOSS",1.95f);
+  ui_text(180,12,phase==0?"BOSS BARBERS":"THE FINAL HAIRCUT",1.00f);
+  ui_text(419,8,music_enabled?"MUSIC":"MUTED",.93f);
   if(phase!=0){
-    const char *z=zoom_level==0?"ZOOM 1X":(zoom_level==1?"ZOOM 1.4X":"ZOOM 1.8X");
-    ui_text(298,15,z,1.0f);
+    int finishing=phase==1 && n_hairs-removed>0 && n_hairs-removed<=12 && !finish_zoom_override;
+    const char *z=finishing?"FINISH CAM":(zoom_level==0?"ZOOM 1X":(zoom_level==1?"ZOOM 1.4X":"ZOOM 1.8X"));
+    ui_text(337,28,z,1.0f);
   }
 
   if(phase==0){
     /* A dedicated intro panel sits beside the smaller rotating portrait. */
-    ui_box(236,61,231,151,C(10,16,27));
-    ui_box(236,61,3,151,C(64,184,179));
-    ui_text(251,73,"THE BALD BOSS CREED",1.17f);
-    ui_text(252,103,"BALD MEN ARE THE",1.04f);
-    ui_text(252,119,"TOUGHEST ON EARTH.",1.04f);
+    ui_box(236,61,231,151,C(10,18,28));
+    ui_box(236,61,3,151,C(193,155,80));
+    ui_text(268,66,"BOSS BARBERS",1.28f);
+    ui_text(251,88,"THE BALD BOSS CREED",1.10f);
+    ui_text(252,113,"BALD MEN ARE THE",1.04f);
+    ui_text(252,129,"TOUGHEST ON EARTH.",1.04f);
     ui_text(252,147,"ONLY TRUE BALD BOSSES",.90f);
     ui_text(252,160,"WELCOME HERE.",.90f);
-    ui_text(263,187,"PRESS X TO START",1.28f);
-    ui_text(18,229,"NO WIGS. NO FEAR. JUST BALDNESS.",1.02f);
-    ui_text(19,252,"L/R TURN  O ZOOM  TRI SHADES  SELECT MUSIC",.89f);
+    ui_text(262,181,"PRESS X TO START",1.22f);
+    ui_text(278,195,"THE CHAIR AWAITS",0.92f);
+    ui_text(18,227,"NO WIGS. NO FEAR. JUST BALDNESS.",1.02f);
+    ui_text(19,253,"X START  L/R TURN  O ZOOM  SELECT MUSIC",.95f);
   } else {
-    ui_box(14,233,110,6,C(43,56,67));
-    ui_box(14,233,(110*removed)/(n_hairs?n_hairs:1),6,C(61,222,171));
-    ui_box(141,227,1,31,C(46,65,80));
-    ui_box(298,227,1,31,C(46,65,80));
-    ui_text(13,224,"SHAVED",1.15f);
+    ui_box(9,227,129,36,C(17,30,42));
+    ui_box(146,227,143,36,C(17,30,42));
+    ui_box(297,227,174,36,C(17,30,42));
+    ui_box(14,239,109,4,C(43,56,67));
+    ui_box(14,239,(109*removed)/(n_hairs?n_hairs:1),4,C(80,211,177));
+    ui_box(140,226,2,39,C(193,155,80));
+    ui_box(291,226,2,39,C(193,155,80));
+    ui_text(14,225,"SHAVED",1.05f);
     char buf[32];
     snprintf(buf,sizeof(buf),"%d%%",n_hairs?removed*100/n_hairs:0);
-    ui_text(14,243,buf,1.85f);
-    ui_text(155,224,"SCORE",1.15f);
+    ui_text(83,246,buf,1.45f);
+    ui_text(153,225,"SCORE",1.05f);
     snprintf(buf,sizeof(buf),"%d",score);
-    ui_text(155,243,buf,1.85f);
-    ui_text(311,224,"TIME",1.15f);
+    ui_text(153,246,buf,1.45f);
+    ui_text(306,225,"TIME",1.05f);
     int seconds=90-play_frames/60;if(seconds<0)seconds=0;
     snprintf(buf,sizeof(buf),"%02d:%02d",seconds/60,seconds%60);
-    ui_text(312,243,buf,1.85f);
+    ui_text(306,246,buf,1.45f);
+    snprintf(buf,sizeof(buf),"LEFT %d",n_hairs-removed);
+    ui_text(396,246,buf,1.05f);
+    if(phase==1 && n_hairs-removed<=12){
+      ui_box(297,220,174,7,C(47,74,86));
+      ui_text(397,226,"TRACK",.86f);
+    }
     if(phase==2){
       ui_box(104,168,272,42,C(10,16,27));
       ui_text(158,181,"MASTER BARBER!",1.65f);
@@ -355,13 +460,34 @@ static void draw_ui(void){
       ui_text(168,181,"TIME IS UP!",1.65f);
     }
     if(phase!=1 && frame%90>45)ui_text(192,202,"X TO RESTART",1.15f);
-    if(phase==1){
+    if(phase==1 && !paused){
+      draw_last_hair_markers();
       int cx=(int)cursor_x,cy=(int)cursor_y;
       ui_box(cx-9,cy-27,18,28,C(35,45,59));
       ui_box(cx-8,cy-29,16,6,C(189,199,206));
       for(int i=-6;i<=6;i+=4)ui_box(cx+i,cy-33,2,5,C(222,230,229));
       ui_box(cx-5,cy-9,10,8,shave_flash?C(61,228,183):C(42,184,202));
       ui_box(cx-1,cy+5,2,9,C(255,221,135));
+    }
+    if(paused){
+      ui_box(103,60,274,156,C(8,14,22));
+      ui_box(106,63,268,150,C(26,37,48));
+      ui_box(109,66,262,25,C(14,28,40));
+      ui_box(109,66,262,3,C(196,160,91));
+      ui_text(207,75,"PAUSED",1.55f);
+      ui_text(125,95,"CHOOSE YOUR NEXT MOVE",1.00f);
+      for(int i=0;i<3;i++){
+        int top=117+i*24;
+        ui_box(125,top,230,20,pause_choice==i?C(58,77,92):C(16,25,35));
+        if(pause_choice==i){
+          ui_box(125,top,4,20,C(239,192,96));
+          ui_text(137,top+5,">",1.0f);
+        }
+      }
+      ui_text(188,122,"RESUME",1.20f);
+      ui_text(174,146,"RESTART RUN",1.20f);
+      ui_text(160,170,"RETURN TO TITLE",1.20f);
+      ui_text(132,199,"UP/DOWN  X SELECT  O BACK",1.0f);
     }
   }
   /* PSP 2D sprite font: proven in PPSSPP, no problematic texture UVs. */
@@ -379,32 +505,34 @@ static void render_head(void){
   sceGumMatrixMode(GU_VIEW);sceGumLoadIdentity();
   sceGumMatrixMode(GU_MODEL);sceGumLoadIdentity();
   /* Smaller portrait on the title screen makes room for the introduction. */
-  ScePspFVector3 pos={phase==0?-1.15f:0.0f,
-                      phase==0?0.06f:CAM_Y,
-                      phase==0?-7.40f:-zoom_camera_distance()};
+  ScePspFVector3 pos={phase==0?-1.02f:0.0f,
+                      phase==0?0.10f:CAM_Y,
+                      phase==0?-6.90f:-zoom_camera_distance()};
   sceGumTranslate(&pos);
   ScePspFVector3 rot={0,yaw,0};sceGumRotateXYZ(&rot);
   sceGuEnable(GU_DEPTH_TEST);sceGuDepthMask(GU_FALSE);
   sceGuEnable(GU_LIGHTING);sceGuEnable(GU_LIGHT0);sceGuEnable(GU_LIGHT1);
-  ScePspFVector3 sun={-0.34f,0.72f,0.61f};
-  ScePspFVector3 fill={0.52f,0.16f,0.84f};
+  ScePspFVector3 sun={-0.20f,0.64f,0.74f};
+  ScePspFVector3 fill={0.38f,0.10f,0.92f};
   sceGuLight(0,GU_DIRECTIONAL,GU_DIFFUSE,&sun);
-  sceGuLightColor(0,GU_DIFFUSE,0x00fff0e2);
+  sceGuLightColor(0,GU_DIFFUSE,0x00fff7ee);
   sceGuLight(1,GU_DIRECTIONAL,GU_DIFFUSE,&fill);
-  sceGuLightColor(1,GU_DIFFUSE,0x005d7084);
-  sceGuAmbient(0x00404b58);
-  sceGuMaterial(GU_AMBIENT,0xffa07a62);
-  sceGuMaterial(GU_DIFFUSE,0xfff4ccb0);
+  sceGuLightColor(1,GU_DIFFUSE,0x003b4656);
+  sceGuAmbient(0x001f2730);
+  sceGuMaterial(GU_AMBIENT,0xffffffff);
+  sceGuMaterial(GU_DIFFUSE,0xffffffff);
   sceGuAmbientColor(0xffffffff);
   sceGuEnable(GU_TEXTURE_2D);
   sceGuTexMode(GU_PSM_5650,0,0,0);
   sceGuTexImage(0,128,128,128,skin_tex);
-  sceGuTexFunc(GU_TFX_MODULATE,GU_TCC_RGB);
-  sceGuTexFilter(GU_LINEAR,GU_LINEAR);
+  sceGuTexFunc(GU_TFX_REPLACE,GU_TCC_RGB);
+  sceGuTexFilter(GU_NEAREST,GU_NEAREST);
+  sceGuDisable(GU_LIGHTING); /* show face texture clearly instead of washing it out */
   sceGuColor(0xffffffff);
   sceGumDrawArray(GU_TRIANGLES,
     GU_TEXTURE_32BITF|GU_NORMAL_32BITF|GU_VERTEX_32BITF|GU_TRANSFORM_3D,
     n_head,0,head);
+  sceGuEnable(GU_LIGHTING);
   draw_beard_stubble();
   /* The CC0 imported mesh already includes anatomical nose, lips, jaw, ears
      and shoulders. Do not overlay primitive spheres on it. */
@@ -415,8 +543,17 @@ static void render_head(void){
 static void reset_game(void){
   for(int i=0;i<n_hairs;i++)hairs[i].gone=0;
   removed=0;score=0;play_frames=0;cursor_x=240;cursor_y=130;
-  yaw=0;shave_flash=0;phase=1;
-  zoom_level=0;clipper_active=0;stop_voice_pending=1;
+  yaw=0;shave_flash=0;phase=1;paused=0;pause_choice=0;
+  zoom_level=0;finish_zoom_override=0;current_camera_distance=CAM_DISTANCE;
+  clipper_active=0;restart_grace=10;stop_voice_pending=1;
+  win_voice_pending=0;
+}
+static void return_to_title(void){
+  for(int i=0;i<n_hairs;i++)hairs[i].gone=0;
+  removed=0;score=0;play_frames=0;cursor_x=240;cursor_y=130;
+  yaw=0;shave_flash=0;phase=0;paused=0;pause_choice=0;
+  zoom_level=0;finish_zoom_override=0;current_camera_distance=CAM_DISTANCE;
+  clipper_active=0;restart_grace=0;stop_voice_pending=1;
   win_voice_pending=0;
 }
 static void shave_at_cursor(void){
@@ -441,23 +578,42 @@ static void shave_at_cursor(void){
   if(removed>=n_hairs && n_hairs>0 && phase==1){
     phase=2;
     clipper_active=0;
-    win_voice_pending=1;
+    win_voice_pending=1; /* Announce a fully shaved head just once. */
   }
 }
 static void update(void){
  SceCtrlData pad;
  sceCtrlPeekBufferPositive(&pad,1);
  unsigned int b=pad.Buttons, just=b&~prev_buttons; prev_buttons=b;
- /* These toggles work in menus and while playing. */
- if(just&PSP_CTRL_TRIANGLE)shades_on=!shades_on;
  if(just&PSP_CTRL_SELECT)music_enabled=!music_enabled;
- if(just&PSP_CTRL_CIRCLE && phase==1)zoom_level=(zoom_level+1)%3;
  if(phase!=1){
    clipper_active=0;
    if(just&PSP_CTRL_CROSS)reset_game();
    else if(phase==0)yaw=0.10f*sinf((float)frame*0.010f);
    return;
  }
+ if(just&PSP_CTRL_START){
+   if(!paused){paused=1;pause_choice=0;clipper_active=0;return;}
+   paused=0;clipper_active=0;return;
+ }
+ if(paused){
+   clipper_active=0;
+   if(just&PSP_CTRL_UP)pause_choice=(pause_choice+2)%3;
+   if(just&PSP_CTRL_DOWN)pause_choice=(pause_choice+1)%3;
+   if(just&PSP_CTRL_CIRCLE){paused=0;return;}
+   if(just&PSP_CTRL_CROSS){
+     if(pause_choice==0){paused=0;return;}
+     if(pause_choice==1){reset_game();return;}
+     if(pause_choice==2){return_to_title();return;}
+   }
+   return;
+ }
+ if(just&PSP_CTRL_TRIANGLE)shades_on=!shades_on;
+ if(just&PSP_CTRL_CIRCLE){
+   if(n_hairs-removed<=12)finish_zoom_override=1;
+   zoom_level=(zoom_level+1)%3;
+ }
+ update_camera_zoom();
  if(b&PSP_CTRL_LTRIGGER)yaw-=.034f;
  if(b&PSP_CTRL_RTRIGGER)yaw+=.034f;
  if(yaw>=2*PI)yaw-=2*PI;
@@ -469,7 +625,8 @@ static void update(void){
  if(pad.Lx>146||pad.Lx<110)cursor_x+=((int)pad.Lx-128)/35.0f;
  if(pad.Ly>146||pad.Ly<110)cursor_y+=((int)pad.Ly-128)/35.0f;
  cursor_x=CLAMP(cursor_x,35,445);cursor_y=CLAMP(cursor_y,60,207);
- clipper_active=(b&(PSP_CTRL_CROSS|PSP_CTRL_SQUARE))?1:0;
+ if(restart_grace>0){restart_grace--;clipper_active=0;}
+ else clipper_active=(b&(PSP_CTRL_CROSS|PSP_CTRL_SQUARE))?1:0;
  if(clipper_active)shave_at_cursor();
  if(shave_flash)shave_flash--;
  play_frames++;
@@ -583,6 +740,7 @@ static void draw_frame(void){
  sceGuStart(GU_DIRECT,gu_list);
  sceGuClearColor(C(13,26,42));sceGuClearDepth(0);
  sceGuClear(GU_COLOR_BUFFER_BIT|GU_DEPTH_BUFFER_BIT);
+ draw_backdrop();
  render_head();
  draw_ui();
  sceGuFinish();sceGuSync(GU_SYNC_FINISH,GU_SYNC_WHAT_DONE);
