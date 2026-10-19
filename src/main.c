@@ -1,10 +1,11 @@
-/* Bald Boss 3D - PSP Edition v0.2 (HUD fix). Original homebrew source.
+/* Bald Boss 3D - PSP Edition v0.3 (centered face, original music, detailed face). Original homebrew source.
    Uses PSPSDK GU/GUM hardware 3D renderer. No PS1 BIOS calls. */
 #include <pspkernel.h>
 #include <pspctrl.h>
 #include <pspdisplay.h>
 #include <pspgu.h>
 #include <pspgum.h>
+#include <pspaudio.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,6 +22,13 @@ PSP_MAIN_THREAD_ATTR(THREAD_ATTR_USER | THREAD_ATTR_VFPU);
 #define HR 28
 #define HS 44
 #define HAIRS 1250
+#define FACE_STUBBLE 300
+#define AUDIO_SAMPLES 1024
+#define AUDIO_RATE 44100
+#define MUSIC_STEP_SAMPLES 11025
+#define CAM_DISTANCE 4.35f
+#define CAM_Y 0.18f
+#define FOCAL_PIXELS 312.5f
 #define MAX_HAIR_VERTS (HAIRS*6)
 #define MAX_HEAD_VERTS (HR*HS*6)
 #define HUD_QUADS 4096 /* font is now drawn using reliable solid-color sprite rectangles */
@@ -41,6 +49,8 @@ static int n_head=0;
 static LitVertex __attribute__((aligned(16))) feature[4096];
 static int n_feature=0;
 static PosVertex __attribute__((aligned(16))) hair_mesh[MAX_HAIR_VERTS];
+static PosVertex __attribute__((aligned(16))) beard_stubble[FACE_STUBBLE*3];
+static int n_beard_stubble=0;
 static int n_hair_verts=0;
 static UiVertex __attribute__((aligned(16))) hud[HUD_QUADS*2];
 static int n_hud=0;
@@ -51,6 +61,10 @@ static float yaw=0.0f, cursor_x=240.0f,cursor_y=128.0f;
 static unsigned int prev_buttons=0;
 static unsigned int rand_seed=0xB01D2026u;
 static int shave_flash=0;
+static int shades_on=0;
+static volatile int music_enabled=1;
+static int audio_channel=-1;
+static short __attribute__((aligned(64))) audio_pcm[2][AUDIO_SAMPLES*2];
 
 /* 5x7 ASCII font: glyphs 32..95. We draw it as colored sprites (no texture UVs). */
 static const unsigned char font5[][5]={
@@ -77,15 +91,18 @@ static float rand01(void){return (float)((random_u32()>>8)&65535)/65535.0f;}
 static float fsq(float a){return a*a;}
 static void normalize(float *x,float *y,float *z){float l=sqrtf(fsq(*x)+fsq(*y)+fsq(*z));if(l>0.000001f){*x/=l;*y/=l;*z/=l;}}
 
+/* RGB565 offers smoother complexion gradients than the original 4-bit RGB4444.
+   The colour noise is subtle, rather than high-contrast random mottling. */
 static void make_textures(void){
-  int x,y;
-  for(y=0;y<128;y++)for(x=0;x<128;x++){
+  for(int y=0;y<128;y++)for(int x=0;x<128;x++){
+    float u=((float)x-63.5f)/63.5f,v=((float)y-64.0f)/64.0f;
+    float cheeks=expf(-fsq(v-.20f)*16.0f)*expf(-fsq(fabsf(u)-.47f)*18.0f);
     int grain=(int)(random_u32()%5)-2;
-    int cheek=(x>37&&x<90&&y>55&&y<85)?1:0;
-    int r=CLAMP(12+grain/2+cheek,0,15),g=CLAMP(9+grain/2,0,15),b=CLAMP(7+grain/3,0,15);
-    skin_tex[y*128+x]=(unsigned short)(0xf000|(b<<8)|(g<<4)|r);
+    int r=CLAMP(208+grain+(int)(cheeks*7),0,255);
+    int g=CLAMP(158+grain+(int)(cheeks*1),0,255);
+    int b=CLAMP(129+grain,0,255);
+    skin_tex[y*128+x]=(unsigned short)(((b>>3)<<11)|((g>>2)<<5)|(r>>3));
   }
-
 }
 
 static void add_tri(TexturedVertex a,TexturedVertex b,TexturedVertex c){if(n_head+3>MAX_HEAD_VERTS)return;head[n_head++]=a;head[n_head++]=b;head[n_head++]=c;}
@@ -160,6 +177,33 @@ static void make_hairs(void){
    h->length=0.040f+0.041f*rand01();
    h->gone=0;
  }
+}
+
+/* Dense facial shadow: tiny low-contrast triangular strands on jaw and cheeks.
+   Generate this once, draw with depth testing like the scalp hair. */
+static void make_beard_stubble(void){
+ n_beard_stubble=0;
+ for(int i=0;i<FACE_STUBBLE;i++){
+  float a=1.87f+.83f*rand01();
+  float p=(rand01()-.5f)*2.25f;
+  TexturedVertex v=surface(a,p);
+  if(v.y>-.27f && fabsf(v.x)<.19f)continue;
+  float side=cosf(p),forward=-sinf(p);
+  float off=.013f;
+  float x=v.x+v.nx*off,y=v.y+v.ny*off,z=v.z+v.nz*off;
+  float w=.0030f+.0025f*rand01();
+  float h=.006f+.006f*rand01();
+  if(n_beard_stubble+3>FACE_STUBBLE*3)break;
+  beard_stubble[n_beard_stubble++]=(PosVertex){x-w*side,y,z-w*forward};
+  beard_stubble[n_beard_stubble++]=(PosVertex){x+w*side,y,z+w*forward};
+  beard_stubble[n_beard_stubble++]=(PosVertex){x+v.nx*h,y+h*.35f,z+v.nz*h};
+ }
+}
+static void draw_beard_stubble(void){
+ sceGuDisable(GU_TEXTURE_2D);sceGuDisable(GU_LIGHTING);
+ sceGuColor(C(108,76,65));
+ sceGumDrawArray(GU_TRIANGLES,GU_VERTEX_32BITF|GU_TRANSFORM_3D,n_beard_stubble,0,beard_stubble);
+ sceGuEnable(GU_LIGHTING);
 }
 
 static void hair_vertices(PosVertex *dst,Hair *h,int variant){
@@ -254,7 +298,7 @@ static void draw_ui(void){
   }
   ui_text(13,9,"BALD BOSS",2.2f);
   ui_text(198,14,"PSP EDITION",1.15f);
-  ui_text(388,13,"360 DEG",1.3f);
+  ui_text(389,13,music_enabled?"MUSIC ON":"MUSIC OFF",1.0f);
   char buf[32];
   ui_text(13,224,"SHAVED",1.15f);
   snprintf(buf,sizeof(buf),"%d%%",n_hairs?removed*100/n_hairs:0);
@@ -266,7 +310,8 @@ static void draw_ui(void){
   int seconds=90-play_frames/60;if(seconds<0)seconds=0;
   snprintf(buf,sizeof(buf),"%02d:%02d",seconds/60,seconds%60);
   ui_text(312,243,buf,1.85f);
-  if(phase==0)ui_text(170,58,"THE FINAL HAIRCUT",1.2f);
+  if(phase==0){ui_text(172,56,"THE FINAL HAIRCUT",1.2f);
+    ui_text(159,209,"TRI SHADES / SELECT MUSIC",.9f);}
   /* HUD geometry is CPU-generated and must be visible to the GE. */
   sceKernelDcacheWritebackAll();
   sceGuDisable(GU_LIGHTING);sceGuDisable(GU_DEPTH_TEST);sceGuDisable(GU_TEXTURE_2D);sceGuDisable(GU_BLEND);
@@ -279,7 +324,8 @@ static void render_head(void){
   sceGumMatrixMode(GU_PROJECTION);sceGumLoadIdentity();sceGumPerspective(47.0f,(float)SW/SH,0.1f,20.0f);
   sceGumMatrixMode(GU_VIEW);sceGumLoadIdentity();
   sceGumMatrixMode(GU_MODEL);sceGumLoadIdentity();
-  ScePspFVector3 pos={0,-0.03f,-3.55f};sceGumTranslate(&pos);
+  /* Shift the portrait toward the centre of the 45..217 px play area. */
+  ScePspFVector3 pos={0,CAM_Y,-CAM_DISTANCE};sceGumTranslate(&pos);
   ScePspFVector3 rot={0,yaw,0};sceGumRotateXYZ(&rot);
   sceGuEnable(GU_DEPTH_TEST);sceGuDepthMask(GU_FALSE);
   sceGuEnable(GU_LIGHTING);sceGuEnable(GU_LIGHT0);
@@ -291,31 +337,64 @@ static void render_head(void){
   sceGuMaterial(GU_DIFFUSE,0xfff2c09b);
   sceGuAmbientColor(0xffffffff);
   sceGuEnable(GU_TEXTURE_2D);
-  sceGuTexMode(GU_PSM_4444,0,0,0);
+  sceGuTexMode(GU_PSM_5650,0,0,0);
   sceGuTexImage(0,128,128,128,skin_tex);
   sceGuTexFunc(GU_TFX_MODULATE,GU_TCC_RGB);
   sceGuTexFilter(GU_LINEAR,GU_LINEAR);
   sceGuColor(0xffffffff);
   sceGumDrawArray(GU_TRIANGLES,GU_TEXTURE_32BITF|GU_NORMAL_32BITF|GU_VERTEX_32BITF|GU_TRANSFORM_3D,n_head,0,head);
-  /* Anatomical face elements and rounded ears. */
-  draw_ellipsoid(-0.83f,-0.07f,0.0f,.19f,.28f,.11f,C(209,143,115),10,12);
-  draw_ellipsoid(0.83f,-0.07f,0.0f,.19f,.28f,.11f,C(209,143,115),10,12);
-  draw_ellipsoid(-0.89f,-0.07f,.077f,.075f,.175f,.034f,C(141,78,64),7,10);
-  draw_ellipsoid(0.89f,-0.07f,.077f,.075f,.175f,.034f,C(141,78,64),7,10);
-  draw_ellipsoid(0.0f,-0.08f,.91f,.105f,.26f,.16f,C(214,154,124),10,14);
-  draw_ellipsoid(0.0f,-0.23f,1.03f,.16f,.075f,.10f,C(208,137,111),8,12);
-  /* Strong nose bridge, brow and sunglasses, all true 3D objects. */
-  draw_ellipsoid(-.38f,.22f,.74f,.35f,.075f,.12f,C(48,34,32),8,15);
-  draw_ellipsoid(.38f,.22f,.74f,.35f,.075f,.12f,C(48,34,32),8,15);
-  draw_ellipsoid(-.39f,.11f,.835f,.32f,.18f,.06f,C(11,29,39),8,16);
-  draw_ellipsoid(.39f,.11f,.835f,.32f,.18f,.06f,C(11,29,39),8,16);
-  draw_ellipsoid(0.0f,.16f,.95f,.14f,.035f,.055f,C(187,142,81),5,12);
-  draw_ellipsoid(-.38f,.11f,.89f,.30f,.025f,.025f,C(208,176,94),5,12);
-  draw_ellipsoid(.38f,.11f,.89f,.30f,.025f,.025f,C(208,176,94),5,12);
-  /* Separate lower-lip shadows and goatee instead of holes through the mesh. */
-  draw_ellipsoid(0.0f,-.53f,.78f,.24f,.041f,.04f,C(109,64,63),7,14);
-  draw_ellipsoid(0.0f,-.605f,.765f,.18f,.045f,.037f,C(185,119,112),6,14);
-  draw_ellipsoid(0.0f,-.75f,.70f,.31f,.13f,.025f,C(80,55,51),7,16);
+  /* The following pieces all share the model matrix and thus rotate naturally
+     through 360 degrees together with the rest of the head. */
+  draw_beard_stubble();
+  /* Anatomically shaped ears, cavities, rims, and tragus. */
+  for(int side=-1;side<=1;side+=2){
+    float sign=(float)side;
+    draw_ellipsoid(sign*.83f,-.07f,0.0f,.19f,.26f,.12f,C(209,149,121),12,16);
+    draw_ellipsoid(sign*.89f,-.055f,.086f,.085f,.16f,.043f,C(130,79,70),9,12);
+    draw_ellipsoid(sign*.86f,-.10f,.122f,.055f,.115f,.026f,C(187,116,98),9,12);
+    draw_ellipsoid(sign*.81f,-.17f,.115f,.051f,.059f,.033f,C(217,150,122),7,10);
+    /* Cheekbone highlights and soft lower eye contours. */
+    draw_ellipsoid(sign*.50f,-.16f,.690f,.225f,.103f,.060f,C(205,149,124),9,15);
+    draw_ellipsoid(sign*.34f,.055f,.802f,.24f,.048f,.038f,C(176,118,102),6,13);
+    /* Eye socket, sclera, iris, pupil, lid, and a tiny specular highlight. */
+    draw_ellipsoid(sign*.345f,.123f,.806f,.246f,.129f,.066f,C(136,91,82),10,16);
+    draw_ellipsoid(sign*.345f,.118f,.857f,.208f,.086f,.040f,C(232,222,201),10,16);
+    draw_ellipsoid(sign*.345f,.115f,.897f,.078f,.078f,.025f,C(90,123,109),9,15);
+    draw_ellipsoid(sign*.345f,.115f,.918f,.038f,.061f,.015f,C(26,38,38),9,13);
+    draw_ellipsoid(sign*.365f,.144f,.934f,.017f,.017f,.009f,C(243,243,235),6,9);
+    draw_ellipsoid(sign*.35f,.221f,.852f,.24f,.033f,.036f,C(184,117,96),6,15);
+    draw_ellipsoid(sign*.36f,.305f,.818f,.26f,.039f,.043f,C(66,48,42),7,15);
+    /* Nasolabial folds and natural under-eye creases. */
+    draw_ellipsoid(sign*.235f,-.34f,.856f,.027f,.14f,.020f,C(183,123,103),9,12);
+    draw_ellipsoid(sign*.48f,-.015f,.765f,.17f,.020f,.020f,C(176,121,105),5,13);
+  }
+  /* Raised nose bridge, tip, nostril wings, and realistic shadowed nostrils. */
+  draw_ellipsoid(0.0f,-.042f,.890f,.098f,.245f,.12f,C(213,155,126),12,16);
+  draw_ellipsoid(0.0f,-.24f,1.0f,.164f,.090f,.102f,C(222,165,132),12,18);
+  draw_ellipsoid(-.125f,-.286f,.978f,.077f,.067f,.056f,C(208,146,115),9,12);
+  draw_ellipsoid(.125f,-.286f,.978f,.077f,.067f,.056f,C(208,146,115),9,12);
+  draw_ellipsoid(-.104f,-.340f,1.018f,.043f,.023f,.015f,C(86,51,48),6,11);
+  draw_ellipsoid(.104f,-.340f,1.018f,.043f,.023f,.015f,C(86,51,48),6,11);
+  /* Philtrum, upper / lower lips, mouth seam and chin dimple. */
+  draw_ellipsoid(0.0f,-.415f,.876f,.042f,.075f,.018f,C(177,118,105),7,12);
+  draw_ellipsoid(0.0f,-.538f,.805f,.245f,.039f,.044f,C(130,77,72),8,17);
+  draw_ellipsoid(0.0f,-.566f,.828f,.214f,.021f,.029f,C(91,55,55),7,17);
+  draw_ellipsoid(0.0f,-.612f,.818f,.205f,.049f,.043f,C(186,114,105),8,17);
+  draw_ellipsoid(0.0f,-.738f,.730f,.255f,.110f,.028f,C(185,124,105),9,16);
+  draw_ellipsoid(0.0f,-.810f,.746f,.050f,.021f,.017f,C(151,104,91),7,12);
+  /* Optional sunglasses. TRIANGLE toggles to show the eyes and eyebrows. */
+  if(shades_on){
+    draw_ellipsoid(-.375f,.140f,.918f,.332f,.169f,.043f,C(17,29,39),10,18);
+    draw_ellipsoid(.375f,.140f,.918f,.332f,.169f,.043f,C(17,29,39),10,18);
+    draw_ellipsoid(-.375f,.280f,.906f,.335f,.030f,.034f,C(33,29,28),7,18);
+    draw_ellipsoid(.375f,.280f,.906f,.335f,.030f,.034f,C(33,29,28),7,18);
+    draw_ellipsoid(0.0f,.195f,.970f,.148f,.027f,.039f,C(178,140,80),6,14);
+    draw_ellipsoid(-.392f,.139f,.962f,.275f,.013f,.014f,C(205,174,95),5,14);
+    draw_ellipsoid(.392f,.139f,.962f,.275f,.013f,.014f,C(205,174,95),5,14);
+    /* Tiny reflected light streaks in the glass. */
+    draw_ellipsoid(-.50f,.182f,.969f,.072f,.010f,.008f,C(65,98,113),5,10);
+    draw_ellipsoid(.25f,.182f,.969f,.065f,.010f,.008f,C(65,98,113),5,10);
+  }
   /* Neck and a broad shirt make the head appear proportionate. */
   draw_ellipsoid(0.0f,-1.18f,-.10f,.37f,.45f,.32f,C(188,123,100),10,14);
   draw_ellipsoid(0.0f,-1.77f,-.30f,1.15f,.58f,.54f,C(31,47,68),9,18);
@@ -336,9 +415,10 @@ static void shave_at_cursor(void){
     float xx=h->x*c+h->z*s;
     float face=h->nz*c-h->nx*s;
     if(face<0.13f)continue; /* Never shave hidden back-side hair. */
-    float inv=1.0f/(3.55f-zz);
-    float sx=240.0f+303.0f*xx*inv;
-    float sy=136.0f-303.0f*(h->y-.03f)*inv;
+    /* Camera and hit-testing share exactly the same perspective model. */
+    float inv=1.0f/(CAM_DISTANCE-zz);
+    float sx=240.0f+FOCAL_PIXELS*xx*inv;
+    float sy=136.0f-FOCAL_PIXELS*(h->y+CAM_Y)*inv;
     if(fsq((sx-cursor_x)/17.0f)+fsq((sy-cursor_y)/20.0f)<1.0f){
       h->gone=1;removed++;score+=20;hit++;
     }
@@ -350,6 +430,9 @@ static void update(void){
  SceCtrlData pad;
  sceCtrlPeekBufferPositive(&pad,1);
  unsigned int b=pad.Buttons, just=b&~prev_buttons; prev_buttons=b;
+ /* These toggles work in menus and while playing. */
+ if(just&PSP_CTRL_TRIANGLE)shades_on=!shades_on;
+ if(just&PSP_CTRL_SELECT)music_enabled=!music_enabled;
  if(phase!=1){
    if(just&PSP_CTRL_CROSS)reset_game();
    else if(phase==0)yaw+=.007f;
@@ -370,6 +453,61 @@ static void update(void){
  if(shave_flash)shave_flash--;
  play_frames++;
  if(play_frames>=90*60)phase=3;
+}
+
+/* Original generative chiptune: no audio files, no licensed samples.
+   Three gentle synthesizer voices in a dedicated PSP audio thread.
+   44100 Hz, 16-bit signed interleaved stereo PCM, continuously streamed. */
+static const unsigned char melody_notes[32]={
+  72,76,79,76,74,77,81,77, 76,79,84,79,77,74,72,0,
+  74,77,81,77,76,79,83,79, 72,76,79,76,74,71,72,0
+};
+static const unsigned char bass_notes[8]={48,48,53,53,45,50,48,48};
+static float midi_hz(int midi){return 440.0f*powf(2.0f,(midi-69)/12.0f);}
+static float triangle_wave(float phase){return 1.0f-4.0f*fabsf(phase-0.5f);}
+static int audio_thread(SceSize args,void *argp){
+ (void)args;(void)argp;
+ int ch=sceAudioChReserve(PSP_AUDIO_NEXT_CHANNEL,AUDIO_SAMPLES,PSP_AUDIO_FORMAT_STEREO);
+ if(ch<0)return 0;
+ audio_channel=ch;
+ float melody_phase=0.0f,bass_phase=0.0f,chord_phase=0.0f;
+ int step=0,within_step=0,bufno=0;
+ float mel_hz=midi_hz(72),bass_hz=midi_hz(48),chord_hz=midi_hz(60);
+ unsigned int noise=0x159e1u;
+ while(1){
+  short *buf=audio_pcm[bufno];
+  for(int i=0;i<AUDIO_SAMPLES;i++){
+   if(within_step==0){
+     mel_hz=melody_notes[step]?midi_hz(melody_notes[step]):0.0f;
+     bass_hz=midi_hz(bass_notes[(step/4)%8]);
+     chord_hz=midi_hz((step/8)%2?67:64);
+   }
+   float env=1.0f-(float)within_step/(float)MUSIC_STEP_SAMPLES;
+   float melody=mel_hz>0.0f?triangle_wave(melody_phase)*env*.32f:0.0f;
+   float bass=triangle_wave(bass_phase)*.16f;
+   float chord=triangle_wave(chord_phase)*.065f;
+   noise=noise*1664525u+1013904223u;
+   float beat=(within_step<1350 && (step%2)==0)
+      ?(1.0f-(float)within_step/1350.0f)*((noise&65535)/32768.0f-1.0f)*.070f:0.0f;
+   float s=CLAMP(melody+bass+chord+beat,-.87f,.87f);
+   short pcm=music_enabled?(short)(s*14500.0f):0;
+   buf[i*2]=pcm;buf[i*2+1]=pcm;
+   melody_phase+=mel_hz/AUDIO_RATE; if(melody_phase>=1.0f)melody_phase-=1.0f;
+   bass_phase+=bass_hz/AUDIO_RATE; if(bass_phase>=1.0f)bass_phase-=1.0f;
+   chord_phase+=chord_hz/AUDIO_RATE; if(chord_phase>=1.0f)chord_phase-=1.0f;
+   within_step++;
+   if(within_step>=MUSIC_STEP_SAMPLES){within_step=0;step=(step+1)%32;}
+  }
+  sceKernelDcacheWritebackRange(buf,AUDIO_SAMPLES*2*sizeof(short));
+  if(sceAudioOutputBlocking(ch,PSP_AUDIO_VOLUME_MAX,buf)<0)break;
+  bufno^=1;
+ }
+ sceAudioChRelease(ch);audio_channel=-1;
+ return 0;
+}
+static void start_music(void){
+ int th=sceKernelCreateThread("bald_boss_music",audio_thread,0x18,0x2000,0,NULL);
+ if(th>=0)sceKernelStartThread(th,0,NULL);
 }
 
 static int exit_cb(int arg1,int arg2,void *arg){(void)arg1;(void)arg2;(void)arg;sceKernelExitGame();return 0;}
@@ -415,9 +553,10 @@ int main(int argc,char**argv){
  setup_callbacks();
  sceCtrlSetSamplingCycle(0);
  sceCtrlSetSamplingMode(PSP_CTRL_MODE_ANALOG);
- make_textures();make_head();make_hairs();
+ make_textures();make_head();make_hairs();make_beard_stubble();
  sceKernelDcacheWritebackAll();
  init_graphics();
+ start_music();
  while(1){update();draw_frame();frame++;}
  sceGuTerm();sceKernelExitGame();return 0;
 }
