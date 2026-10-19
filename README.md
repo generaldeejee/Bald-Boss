@@ -1,4 +1,4 @@
-# Bald Boss 3D — PSP Edition v0.9.3 (public beta candidate)
+# Bald Boss 3D — PSP Edition v0.9.4 (public beta candidate)
 
 **Bald Boss 3D** is an original, humorous, native PlayStation Portable (PSP) homebrew game. You play the **Club Barber**: shave a rotating 3D head with an electric clipper and help applicants earn the title **Bald Boss**.
 
@@ -23,7 +23,11 @@ In the title screen, the barber's workspace is called **Club Barber's Chair**, n
 
 Built in C with the open-source PSPDEV/PSPSDK toolchain and PSP GU/GUM rendering. It is **not** a PS1 executable and needs **no PS1 BIOS**.
 
-## What's new in v0.9.3
+## What's new in v0.9.4
+
+- **Expressive menu song (v0.9.4):** the title/results song **“No Hair, No Fear!”** now regenerates its original verses and chorus as a more naturally inflected deep male **spoken-rock performance**, using the same Piper John voice as the victory announcer. Different delivery styles for the verse/chorus, light stadium reverb, phrasing variation, and no artificial deep-speed trick. The original 80s guitar/synth/drum backing and game-mode instrumental are preserved. It is NOT real human singing or pitch-accurate synthesized singing; it remains an AI-generated rhythmic spoken chant.
+- **Build verification:** the music generator downloads and verifies the voice model using `tools/generate_voice.py` and GitHub Actions confirms the generated PCM8 music header contains `BALD_BOSS_MUSIC_VOCALS_PIPER 1`. Piper runs only on the build machine, not on PSP.
+
 
 - **Consistent theme (v0.9.3):** game title *Bald Boss 3D*, club *The Elite Bald Man Club*, player *Club Barber*, accepted member *Bald Boss*. Replaced the confusing *Boss Barbers* and *Elite Bald Club* aliases across the in-game menus. Win voice and music remain unchanged.
 
@@ -109,7 +113,7 @@ The game renders at **480×272**, uses its own PSP GU/GUM renderer, and generate
 
 - **Source code:** MIT; see [LICENSE](LICENSE).
 - **Original 3D head and UV paint generator:** project-authored and marked CC0 in `src/bald_head_v2.h`.
-- **Soundtrack:** original/AI-assisted procedural compositions and eSpeak-derived vocals made using the repository's music generators. The title/results use the Deep Voice track; gameplay uses its instrumental.
+- **Soundtrack:** original/AI-assisted procedural rock backing with expressive Piper neural male spoken-rock vocals; no human performance is implied. The title/results use the full vocal track; gameplay uses its instrumental. Audio is generated from source and baked to low-rate PCM8 for PSP compatibility.
 - **Victory announcer:** synthetic offline speech generated with [Piper](https://github.com/rhasspy/piper) using the [John medium English male voice](https://huggingface.co/rhasspy/piper-voices/tree/main/en/en_US/john/medium), developed from LibriVox public-domain audio (see its [model card](https://huggingface.co/rhasspy/piper-voices/blob/main/en/en_US/john/medium/MODEL_CARD)). Piper is used only at build time; audio samples alone are distributed in the game, not the model or Piper executable. The old eSpeak announcer is available through the explicit `--legacy` generator option.
 - **Development:** project concept and coding work developed in collaboration with ChatGPT. This disclosure is useful when submitting to community homebrew indexes.
 
@@ -119,7 +123,7 @@ No copyrighted Sony game, BIOS or firmware files are distributed.
 
 Before publishing a download on a homebrew site, verify:
 
-- [ ] The latest GitHub Actions **PSP EBOOT** build succeeds and its artifact contains `EBOOT.PBP`.
+- [ ] The latest GitHub Actions **PSP EBOOT** build succeeds, the neural song generator completes, and the artifact contains `EBOOT.PBP`.
 - [ ] Both modes can finish a full shave in PPSSPP without crashes, audio glitches or missing hairs.
 - [ ] Zoom, head pitch, final-hair locator, pause/resume, restart, title navigation and tutorial work.
 - [ ] The victory orbit, stars, score and announcer behave properly after the win.
@@ -127,7 +131,7 @@ Before publishing a download on a homebrew site, verify:
 - [ ] Take genuine in-game screenshots and include them in a GitHub Release.
 - [ ] Publish a ZIP containing `PSP/GAME/BALDBOSS/EBOOT.PBP` with version, changelog and license.
 
-**Verification status:** Source-level integration checks have been performed for v0.9.3. The Piper neural voice generator and changed PSP sample rate still need confirmation from the GitHub Actions build and a PPSSPP listening test. A successful PSPDEV cross-compilation, PPSSPP playthrough of v0.9.0 and physical PSP testing still need confirmation. Do not label this build “fully tested on PSP” until it has been verified.
+**Verification status:** Source-level integration checks have been performed for v0.9.4. The re-generated neural rock vocals, sound quality and PSP build still require confirmation from GitHub Actions and listening tests. The Piper neural voice generator and changed PSP sample rate still need confirmation from the GitHub Actions build and a PPSSPP listening test. A successful PSPDEV cross-compilation, PPSSPP playthrough of v0.9.0 and physical PSP testing still need confirmation. Do not label this build “fully tested on PSP” until it has been verified.
 
 ## Reporting issues
 
