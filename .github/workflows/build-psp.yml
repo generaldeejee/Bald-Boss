@@ -4,16 +4,38 @@ on:
   push:
     paths:
       - "src/**"
+      - "tools/generate_voice.py"
       - "assets/**"
       - "Makefile"
       - ".github/workflows/build-psp.yml"
+
 jobs:
+  generate-voice:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install free speech synthesizer
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y espeak
+      - name: Generate "Another bald boss!" audio
+        run: python3 tools/generate_voice.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BaldBoss-Voice-Sample
+          path: src/voice_sample.h
+          if-no-files-found: error
   psp-build:
+    needs: generate-voice
     runs-on: ubuntu-latest
     container:
       image: pspdev/pspdev:latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: BaldBoss-Voice-Sample
+          path: src
       - name: Build with PSPSDK
         run: make -j2
       - name: Check produced EBOOT
