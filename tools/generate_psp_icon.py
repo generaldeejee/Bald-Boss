@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create the 144x80 PSP XMB icon for The Elite Bald Man Club.
+"""Create the 144x80 PSP XMB icon for Bald Elite.
 
 Original procedural illustration, no external logo or copyrighted graphics.
 Run before make: python3 tools/generate_psp_icon.py
@@ -80,9 +80,9 @@ line([(35, 20), (43, 20)], (255, 225, 140), 1)
 # The full PUBLIC game name, with no competing "Bald Boss" brand.
 x = 51
 for text, y, size, color in [
-    ("THE ELITE", 11, 13, (245, 216, 143)),
-    ("BALD MAN", 32, 13, (245, 246, 242)),
-    ("CLUB", 51, 14, (245, 216, 143)),
+    ("BALD", 11, 19, (245, 216, 143)),
+    ("ELITE", 34, 19, (245, 246, 242)),
+    ("PSP GAME", 61, 10, (245, 216, 143)),
 ]:
     draw.text((x * SCALE, y * SCALE), text,
               font=fitted(text, size, 86), fill=color,
