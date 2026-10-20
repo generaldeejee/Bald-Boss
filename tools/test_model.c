@@ -7,7 +7,7 @@
 #include <assert.h>
 int main(void){
   make_textures();make_head();make_hairs();
-  assert(n_head==HR*HS*6);
+  assert(n_head==NEW_HEAD_RINGS*NEW_HEAD_SLICES*6+NEW_HEAD_SLICES*3);
   assert(n_hairs>700&&n_hairs<=HAIRS);
   for(int i=0;i<n_head;i++){
     assert(isfinite(head[i].x)&&isfinite(head[i].y)&&isfinite(head[i].z));
@@ -49,8 +49,8 @@ int main(void){
       Hair *item=&hairs[i];if(item->gone)continue;
       float z=item->z*c-item->x*s,x=item->x*c+item->z*s;
       if(item->nz*c-item->nx*s<0.40f)continue;
-      cursor_x=240.0f+303.0f*x/(3.55f-z);
-      cursor_y=136.0f-303.0f*(item->y-.03f)/(3.55f-z);
+      cursor_x=240.0f+FOCAL_PIXELS*x/(zoom_camera_distance()-z);
+      cursor_y=136.0f-FOCAL_PIXELS*(item->y+CAM_Y)/(zoom_camera_distance()-z);
       shave_at_cursor();break;
     }
     assert(removed>hits_before);
