@@ -1,6 +1,6 @@
-# The Elite Bald Man Club — PSP Edition v0.9.6 (public beta candidate)
+# Bald Elite — PSP Edition v0.9.7 (public beta candidate)
 
-**The Elite Bald Man Club** (formerly **Bald Boss 3D**) is an original, humorous native PlayStation Portable (PSP) homebrew game. You play the **Club Barber**: shave a rotating 3D head with an electric clipper and help applicants earn the honorary title **Bald Boss**.
+**Bald Elite** (previously developed as **Bald Boss 3D** and briefly titled **The Elite Bald Man Club**) is an original, humorous native PlayStation Portable (PSP) homebrew game. You play the **Club Barber**: shave a rotating 3D head with an electric clipper and help applicants earn the honorary title **Bald Boss**.
 
 ### The Elite Bald Man Club
 
@@ -12,22 +12,31 @@ As the club's barber, your job is to transform hairy applicants into bona fide b
 
 | Name | Meaning |
 | --- | --- |
-| **The Elite Bald Man Club** | Public title of the video game and PSP EBOOT, as well as the name of the fictional club |
-| **Bald Boss 3D** | Former project title; kept in the existing GitHub repository URL for link compatibility |
+| **Bald Elite** | Official public game title and PSP EBOOT name |
+| **The Elite Bald Man Club** | The fictional club within the game, not the game's title |
+| **Bald Boss 3D** | Original working title; the GitHub repository URL remains `generaldeejee/Bald-Boss` for compatibility |
 | **Club Barber** | You, the player: the person who shaves applicants |
 | **Bald Boss** | The honorary rank of each newly accepted bald club member |
 | **Membership Approved!** | An applicant has been completely shaved and accepted |
 | **Membership Denied!** | The applicant failed the timed Challenge; Zen Mode has no timeout |
 
-In the title screen, the barber's workspace is called **Club Barber's Chair**, not a second business or club. **“Another bald boss!”** refers to a newly admitted member, **not** the name of the game. The game and the club now share the name **The Elite Bald Man Club**.
+In the title screen, the barber's workspace is called **Club Barber's Chair**, not a second business or club. **“Another bald boss!”** refers to a newly admitted member, **not** the name of the game. The **game** is called **Bald Elite**; the **club** is **The Elite Bald Man Club**.
 
 Built in C with the open-source PSPDEV/PSPSDK toolchain and PSP GU/GUM rendering. It is **not** a PS1 executable and needs **no PS1 BIOS**.
 
-## What's new in v0.9.6
+## What's new in v0.9.7
 
-- **Public rebrand (v0.9.6):** the game, main menu, PSP module, EBOOT display title and new GitHub Actions build artifacts are now **The Elite Bald Man Club**. **Bald Boss** remains the earned rank of admitted members, and the spoken victory line **“Another bald boss!”** is unchanged. The music and gameplay remain the same.
-- **Brand-new PSP XMB icon:** the build runs `python3 tools/generate_psp_icon.py` to replace the old pre-release icon with an original 144×80 image carrying **THE ELITE / BALD MAN / CLUB**. This generated icon is added to the PSP build. The source PNG still in the Git checkout is superseded by the generated one during the build.
-- **Installation:** the suggested PSP folder is `PSP/GAME/ELITEBALD/EBOOT.PBP`. A different folder name can also work: the EBOOT title, rather than the folder name, controls the displayed title.
+- **Shorter public name:** **Bald Elite** replaces *The Elite Bald Man Club* as the game's title. The longer name stays the name of the fictional club.
+- **PSP branding:** the game header, PSP module, EBOOT display title, build target and 144×80 XMB icon now use **Bald Elite**.
+- **Downloads:** the GitHub Actions EBOOT artifact is now `BaldElite-PSP-EBOOT`, and the asset artifact is `BaldElite-PSP-Assets`. The recommended PSP installation directory is `PSP/GAME/BALDELITE/`.
+- **No gameplay or music changes:** each accepted member still earns the **Bald Boss** title; the victory line stays **“Another bald boss!”**.
+- **Availability:** a preliminary October 2026 search found no obvious existing game with exactly this name. This is not trademark clearance; check BOIP and EUIPO/TMview before public release.
+
+### Previous changes — v0.9.6
+
+- **Public rebrand (v0.9.6):** the game, main menu, PSP module, EBOOT display title and GitHub Actions build artifacts were temporarily called **The Elite Bald Man Club**, superseded by v0.9.7. **Bald Boss** remains the earned rank of admitted members, and the spoken victory line **“Another bald boss!”** is unchanged. The music and gameplay remain the same.
+- **Brand-new PSP XMB icon:** the build runs `python3 tools/generate_psp_icon.py` to replace the old pre-release icon with an original 144×80 image carrying **THE ELITE / BALD MAN / CLUB**. In v0.9.7 the old club-name icon was replaced with the shorter **BALD / ELITE** branding. The source PNG still in the Git checkout is superseded by the generated one during the build.
+- **Installation:** the suggested PSP folder is `PSP/GAME/BALDELITE/EBOOT.PBP`. A different folder name can also work: the EBOOT title, rather than the folder name, controls the displayed title.
 - **Name search:** a public web search did not reveal an obvious identically titled game as of October 2026. That is **not** a trademark clearance. Please check BOIP and EUIPO/TMview before wide-scale release.
 
 ### Previous improvements — v0.9.5
@@ -90,13 +99,13 @@ Download the compiled **EBOOT.PBP** from the [GitHub Actions build page](https:/
 
 **PPSSPP emulator:** open **EBOOT.PBP** using *Load*.
 
-**Physical PSP:** use a homebrew-capable PSP, create the folder `/PSP/GAME/ELITEBALD/` on the Memory Stick, and copy the file as `/PSP/GAME/ELITEBALD/EBOOT.PBP`. Launch it from the PSP Game menu.
+**Physical PSP:** use a homebrew-capable PSP, create the folder `/PSP/GAME/BALDELITE/` on the Memory Stick, and copy the file as `/PSP/GAME/BALDELITE/EBOOT.PBP`. Launch it from the PSP Game menu.
 
 A **GitHub Actions artifact is not a permanent public release**. For a public homebrew-site submission, attach a tested installation ZIP to a proper GitHub Release rather than directing users to a short-lived Actions artifact.
 
 ## Building from source
 
-The GitHub workflow [Build Elite Bald Man Club PSP](https://github.com/generaldeejee/Bald-Boss/actions) generates its audio data and custom PSP icon, then compiles the game. It is triggered automatically for relevant code/asset changes, or manually through *Run workflow*.
+The GitHub workflow [Build Bald Elite PSP](https://github.com/generaldeejee/Bald-Boss/actions) generates its audio data and custom PSP icon, then compiles the game. It is triggered automatically for relevant code/asset changes, or manually through *Run workflow*.
 
 For a local PSPSDK installation, install the free **piper-tts==1.3.0** build-time package along with NumPy and SciPy. The speech model is about 63.5 MB and is cached only on the build computer:
 
@@ -139,9 +148,9 @@ Before publishing a download on a homebrew site, verify:
 - [ ] The victory orbit, stars, score and announcer behave properly after the win.
 - [ ] Test on physical PSP hardware if available, especially PSP-1000 (lower memory), or clearly state if only PPSSPP was tested.
 - [ ] Take genuine in-game screenshots and include them in a GitHub Release.
-- [ ] Publish a ZIP containing `PSP/GAME/ELITEBALD/EBOOT.PBP`, the rebranded 144×80 icon, version, changelog and license.
+- [ ] Publish a ZIP containing `PSP/GAME/BALDELITE/EBOOT.PBP`, the rebranded 144×80 icon, version, changelog and license.
 
-**Verification status:** Source-level checks have been performed for v0.9.6; the rebranded XMB icon, the PSPDEV build and end-to-end emulator or physical PSP runs must still be verified. The older musical smoke test applies to v0.9.5. The complete song generated with Piper, audibility in the PSP mono mix, and the PSPDEV/PPSSPP build still require verification. Do not advertise this edition as studio-quality recorded rock singing. The Piper neural voice generator and changed PSP sample rate still need confirmation from the GitHub Actions build and a PPSSPP listening test. A successful PSPDEV cross-compilation, PPSSPP playthrough of v0.9.0 and physical PSP testing still need confirmation. Do not label this build “fully tested on PSP” until it has been verified.
+**Verification status:** Source-level checks have been performed for v0.9.7; the rebranded XMB icon, the PSPDEV build and end-to-end emulator or physical PSP runs must still be verified. The older musical smoke test applies to v0.9.5. The complete song generated with Piper, audibility in the PSP mono mix, and the PSPDEV/PPSSPP build still require verification. Do not advertise this edition as studio-quality recorded rock singing. The Piper neural voice generator and changed PSP sample rate still need confirmation from the GitHub Actions build and a PPSSPP listening test. A successful PSPDEV cross-compilation, PPSSPP playthrough of v0.9.0 and physical PSP testing still need confirmation. Do not label this build “fully tested on PSP” until it has been verified.
 
 ## Reporting issues
 
