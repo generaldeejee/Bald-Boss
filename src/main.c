@@ -899,11 +899,18 @@ static void update(void){
  if(phase!=1){
    clipper_active=0;
    if(phase==0){
-     if(just&(PSP_CTRL_UP|PSP_CTRL_DOWN))title_mode^=1;
+     if(just&PSP_CTRL_LEFT)select_candidate(candidate_index+CANDIDATE_COUNT-1);
+     if(just&PSP_CTRL_RIGHT)select_candidate(candidate_index+1);
+     if(just&PSP_CTRL_UP)title_mode=0;
+     if(just&PSP_CTRL_DOWN)title_mode=1;
      if(just&PSP_CTRL_TRIANGLE){tutorial_open=1;return;}
      if(just&PSP_CTRL_CROSS){reset_game();return;}
      yaw=0.10f*sinf((float)frame*0.010f);
    }else{
+     if(just&PSP_CTRL_CIRCLE){return_to_title();return;}
+     if(phase==2 && (just&PSP_CTRL_TRIANGLE)){
+       select_candidate(candidate_index+1);reset_game();return;
+     }
      if(just&PSP_CTRL_CROSS){reset_game();return;}
      if(phase==2){
        victory_frames++;
