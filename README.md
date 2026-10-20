@@ -20,7 +20,7 @@ As the club's barber, your job is to transform hairy applicants into bona fide b
 | **Membership Approved!** | An applicant has been completely shaved and accepted |
 | **Membership Denied!** | The applicant failed the timed Challenge; Zen Mode has no timeout |
 
-In the title screen, the barber's workspace is called **Club Barber's Chair**, not a second business or club. **“Another bald boss!”** refers to a newly admitted member, **not** the name of the game. The **game** is called **Bald Elite**; the **club** is **The Elite Bald Man Club**.
+The title screen now doubles as the **applicant and mode selector**. The Club Barber's Chair is the fictional barber's workspace, not a second club. **“Another bald boss!”** refers to a newly admitted member, **not** the name of the game. The **game** is called **Bald Elite**; the **club** is **The Elite Bald Man Club**.
 
 Built in C with the open-source PSPDEV/PSPSDK toolchain and PSP GU/GUM rendering. It is **not** a PS1 executable and needs **no PS1 BIOS**.
 
@@ -156,6 +156,8 @@ Before publishing a download on a homebrew site, verify:
 - [ ] The latest GitHub Actions **PSP EBOOT** build succeeds, the neural song generator completes, and the artifact contains `EBOOT.PBP`.
 - [ ] Both modes can finish a full shave in PPSSPP without crashes, audio glitches or missing hairs.
 - [ ] Zoom, head pitch, final-hair locator, pause/resume, restart, title navigation and tutorial work.
+- [ ] Try all three applicants in both modes; confirm the businessman crop, punk mohawk, professor's silver side hair and distinct outfits display correctly.
+- [ ] Confirm Left/Right applicant preview, X replay, Triangle next applicant, Circle level select, and the gold membership card (including stars, score and voice).
 - [ ] The victory orbit, stars, score and announcer behave properly after the win.
 - [ ] Test on physical PSP hardware if available, especially PSP-1000 (lower memory), or clearly state if only PPSSPP was tested.
 - [ ] Take genuine in-game screenshots and include them in a GitHub Release.
