@@ -1,4 +1,4 @@
-/* Bald Elite - PSP Edition v0.9.7 short public title new anatomical head, UV texture and crown pitch controls barber UI, restart and finish camera with Deep Voice soundtrack. Original homebrew source.
+/* Bald Elite - PSP Edition v0.9.8 three arcade applicants and membership cards new anatomical head, UV texture and crown pitch controls barber UI, restart and finish camera with Deep Voice soundtrack. Original homebrew source.
    Uses PSPSDK GU/GUM hardware 3D renderer. No PS1 BIOS calls. */
 #include <pspkernel.h>
 #include <pspctrl.h>
@@ -73,6 +73,10 @@ static unsigned char shaved_coverage[SKIN_TEXELS];
 static int scalp_tex_dirty=0;
 static int phase=0,frame=0, play_frames=0;
 static int title_mode=0,zen_mode=0; /* 0 Challenge / 1 Zen */
+#define CANDIDATE_COUNT 3
+static int candidate_index=0;
+static const char *candidate_names[CANDIDATE_COUNT]={"THE BUSINESSMAN","THE PUNK","THE PROFESSOR"};
+static const char *candidate_styles[CANDIDATE_COUNT]={"NEAT CUT   EASY","MOHAWK   HARD","SILVER SIDES  TRICKY"};
 static int tutorial_open=0,tutorial_seen=0;
 static int victory_frames=0;
 static float yaw=0.0f,pitch=0.0f,cursor_x=240.0f,cursor_y=128.0f;
@@ -257,8 +261,9 @@ static void draw_ellipsoid(float x,float y,float z,float rx,float ry,float rz,un
 
 static void make_hairs(void){
   n_hairs=0;
-  /* Sample the real imported scalp rather than projecting onto the old sphere. */
-  for(int tries=0; tries<HAIRS*28 && n_hairs<HAIRS;tries++){
+  const int goal=candidate_index==0?900:(candidate_index==1?HAIRS:760);
+  /* One lightweight 3D head; distinct hair silhouettes for every applicant. */
+  for(int tries=0; tries<HAIRS*48 && n_hairs<goal;tries++){
     int tri=((int)(rand01()*(n_head/3)))*3;
     if(tri<0||tri+2>=n_head)continue;
     TexturedVertex *a=&head[tri], *b=&head[tri+1], *c=&head[tri+2];
@@ -268,6 +273,12 @@ static void make_hairs(void){
     float y=wa*a->y+wb*b->y+wc*c->y;
     float z=wa*a->z+wb*b->z+wc*c->z;
     if(y<0.33f || (z>0.58f && y<0.73f))continue;
+    if(candidate_index==1 && fabsf(x)>.28f)continue;
+    if(candidate_index==2){
+      if(y>.86f && fabsf(x)<.58f)continue;
+      if(z>.27f && y>.57f && fabsf(x)<.52f)continue;
+      if(rand01()<.24f)continue;
+    }
     float nx=wa*a->nx+wb*b->nx+wc*c->nx;
     float ny=wa*a->ny+wb*b->ny+wc*c->ny;
     float nz=wa*a->nz+wb*b->nz+wc*c->nz;
@@ -278,8 +289,17 @@ static void make_hairs(void){
     h->v=wa*a->v+wb*b->v+wc*c->v;
     h->tx=nz;h->ty=0;h->tz=-nx;
     normalize(&h->tx,&h->ty,&h->tz);
-    h->length=.022f+.028f*rand01();h->gone=0;
+    h->length=candidate_index==0?(.026f+.020f*rand01()):
+      (candidate_index==1?(.115f+.075f*rand01()):(.032f+.035f*rand01()));
+    h->gone=0;
   }
+}
+/* Rebuild only on selection changes, never during a normal animation frame. */
+static void select_candidate(int index){
+  candidate_index=(index+CANDIDATE_COUNT)%CANDIDATE_COUNT;
+  rand_seed=0xB01D2026u+0x9e3779b9u*(unsigned int)candidate_index;
+  make_hairs();
+  reset_scalp_finish();
 }
 
 /* Dense facial shadow: tiny low-contrast triangular strands on jaw and cheeks.
@@ -339,7 +359,9 @@ static void draw_hair(void){
   if(remaining<=10)sceGuColor((frame/12)%2?C(255,250,120):C(255,120,64));
   else if(remaining<=24)sceGuColor(C(255,225,120));
   else if(remaining<=40)sceGuColor(C(92,64,52));
-  else sceGuColor(C(46,32,28));
+  else if(candidate_index==1)sceGuColor(C(210,72,116));
+  else if(candidate_index==2)sceGuColor(C(196,194,184));
+  else sceGuColor(C(58,40,32));
   PosVertex *hair_copy=(PosVertex*)sceGuGetMemory((size_t)n_hair_verts*sizeof(PosVertex));
   memcpy(hair_copy,hair_mesh,(size_t)n_hair_verts*sizeof(PosVertex));
   sceGumDrawArray(GU_TRIANGLES,GU_VERTEX_32BITF|GU_TRANSFORM_3D,n_hair_verts,0,hair_copy);
@@ -737,7 +759,9 @@ static void render_head(void){
   draw_beard_stubble();
   /* Ear details, neck and shirt are fitted to the new head silhouette. */
   draw_ellipsoid(0.0f,-1.16f,-.08f,.235f,.34f,.23f,C(213,166,132),10,16);
-  draw_ellipsoid(0.0f,-1.67f,-.20f,.88f,.50f,.38f,C(30,55,79),10,18);
+  unsigned shirt=candidate_index==1?C(80,34,58):
+                  (candidate_index==2?C(87,81,105):C(30,55,79));
+  draw_ellipsoid(0.0f,-1.67f,-.20f,.88f,.50f,.38f,shirt,10,18);
   for(int side=-1;side<=1;side+=2){
     float sign=(float)side;
     draw_ellipsoid(sign*.70f,-.12f,-.045f,.12f,.19f,.10f,C(215,169,140),9,13);
@@ -1063,7 +1087,7 @@ int main(int argc,char**argv){
  setup_callbacks();
  sceCtrlSetSamplingCycle(0);
  sceCtrlSetSamplingMode(PSP_CTRL_MODE_ANALOG);
- make_textures();make_head();make_hairs();make_beard_stubble();
+ make_textures();make_head();select_candidate(0);make_beard_stubble();
  sceKernelDcacheWritebackAll();
  init_graphics();
  start_music();
