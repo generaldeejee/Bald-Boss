@@ -1,4 +1,4 @@
-# Bald Elite — PSP Edition v0.9.7 (public beta candidate)
+# Bald Elite — PSP Edition v0.9.8 (public beta candidate)
 
 **Bald Elite** (previously developed as **Bald Boss 3D** and briefly titled **The Elite Bald Man Club**) is an original, humorous native PlayStation Portable (PSP) homebrew game. You play the **Club Barber**: shave a rotating 3D head with an electric clipper and help applicants earn the honorary title **Bald Boss**.
 
@@ -24,7 +24,15 @@ In the title screen, the barber's workspace is called **Club Barber's Chair**, n
 
 Built in C with the open-source PSPDEV/PSPSDK toolchain and PSP GU/GUM rendering. It is **not** a PS1 executable and needs **no PS1 BIOS**.
 
-## What's new in v0.9.7
+## What's new in v0.9.8
+
+- **Three playable applicants:** choose **The Businessman** (neat short haircut; easy), **The Punk** (tall pink mohawk; hard) or **The Professor** (sparse silver side hair; tricky). They use the same PSP-friendly face/head mesh, with distinct hair distributions, lengths, colors and outfits; there are no heavy extra character models.
+- **Applicant selection:** the **title screen doubles as a level selector**. Press **Left/Right** to choose one of the three levels, **Up/Down** for 90-second Challenge or untimed Zen Mode, and **X** to start.
+- **Golden membership ceremony:** a completed shave reveals an animated gold club-membership card with the selected applicant, stars, score and the **Membership Approved!** announcement.
+- **After a level:** press **X** to replay, **Triangle** after a victory to start the next applicant, or **Circle** to return to the selection menu. The existing winning voice and soundtrack are retained.
+- **Testing:** verify each applicant and both modes in PPSSPP; the latest source changes have not yet been confirmed by a new PSPDEV cross-compilation or PSP hardware playthrough.
+
+### Previous improvements — v0.9.7
 
 - **Shorter public name:** **Bald Elite** replaces *The Elite Bald Man Club* as the game's title. The longer name stays the name of the fictional club.
 - **PSP branding:** the game header, PSP module, EBOOT display title, build target and 144×80 XMB icon now use **Bald Elite**.
