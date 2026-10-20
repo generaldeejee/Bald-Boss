@@ -533,7 +533,8 @@ static void draw_tutorial(void){
  ui_text(75,147,"CIRCLE  ZOOM IN OR OUT",1.0f);
  ui_text(75,161,"TRIANGLE  FIND FINAL HAIRS",1.0f);
  ui_text(75,175,"START  PAUSE AND MENU",1.0f);
- ui_text(108,195,"X / CIRCLE  CONTINUE",1.08f);
+ ui_text(94,190,"TITLE L/R  CHOOSE APPLICANT",1.0f);
+ ui_text(146,204,"X / CIRCLE  CONTINUE",1.0f);
 }
 static void draw_ui(void){
   n_hud=0;
@@ -548,6 +549,12 @@ static void draw_ui(void){
   ui_text(180,12,phase==0?"THE ELITE BALD MAN CLUB":"CLUB INITIATION",1.00f);
   ui_text(419,8,music_enabled?"MUSIC":"MUTED",.93f);
   if(phase!=0){
+    char level_label[40];
+    snprintf(level_label,sizeof(level_label),"LV%d  %s",
+             candidate_index+1,candidate_names[candidate_index]);
+    ui_text(19,31,level_label,1.0f);
+  }
+  if(phase!=0){
     int finishing=phase==1 && n_hairs-removed>0 && n_hairs-removed<=12 && !finish_zoom_override;
     const char *z=finishing?"FINISH CAM":(zoom_level==0?"ZOOM 1X":(zoom_level==1?"ZOOM 1.4X":"ZOOM 1.8X"));
     ui_text(337,28,z,1.0f);
@@ -556,19 +563,23 @@ static void draw_ui(void){
   if(phase==0){
     ui_box(236,61,231,151,C(10,18,28));
     ui_box(236,61,3,151,C(193,155,80));
-    ui_text(268,66,"CLUB BARBER\'S CHAIR",1.12f);
-    ui_text(270,85,"YOUR MISSION",1.15f);
-    ui_text(250,102,"ONLY TRULY BALD MEN MAY JOIN.",.92f);
-    ui_text(250,114,"SHAVE THE APPLICANTS. TURN",.92f);
-    ui_text(250,126,"THEM INTO BALD BOSSES!",.99f);
-    ui_box(247,143,210,21,title_mode==0?C(58,77,92):C(21,32,44));
-    ui_box(247,166,210,21,title_mode==1?C(58,77,92):C(21,32,44));
-    ui_box(247,title_mode==0?143:166,4,21,C(239,192,96));
-    ui_text(257,149,"90 SEC CHALLENGE",1.08f);
-    ui_text(257,172,"ZEN MODE NO TIMER",1.08f);
-    ui_text(256,196,"UP/DOWN  X START",.96f);
-    ui_text(18,227,"NO WIGS. NO FEAR. JUST BALDNESS.",1.02f);
-    ui_text(19,253,"UP/DOWN MODE  TRI CONTROLS  X START",.95f);
+    ui_text(264,67,"CHOOSE APPLICANT",1.15f);
+    ui_text(254,85,"LEFT / RIGHT  SELECT",1.0f);
+    ui_box(247,100,210,43,C(22,35,49));
+    ui_box(247,100,4,43,C(239,192,96));
+    char candidate_label[40];
+    snprintf(candidate_label,sizeof(candidate_label),"%d / 3  %s",
+             candidate_index+1,candidate_names[candidate_index]);
+    ui_text(257,109,candidate_label,1.02f);
+    ui_text(258,128,candidate_styles[candidate_index],1.0f);
+    ui_box(247,150,210,21,title_mode==0?C(58,77,92):C(21,32,44));
+    ui_box(247,173,210,21,title_mode==1?C(58,77,92):C(21,32,44));
+    ui_box(247,title_mode==0?150:173,4,21,C(239,192,96));
+    ui_text(257,156,"90 SEC CHALLENGE",1.08f);
+    ui_text(257,179,"ZEN MODE NO TIMER",1.08f);
+    ui_text(257,200,"UP/DOWN MODE   X START",1.0f);
+    ui_text(18,227,"ONLY THE TRULY BALD CAN JOIN THE CLUB.",1.02f);
+    ui_text(19,253,"L/R LEVEL  UP/DOWN MODE  TRI HELP  X START",1.0f);
   } else {
     ui_box(9,227,129,36,C(17,30,42));
     ui_box(146,227,143,36,C(17,30,42));
@@ -603,24 +614,31 @@ static void draw_ui(void){
       ui_text(268,199,"EXTRA 30 SECONDS!",1.0f);
     }
     if(phase==2){
-      ui_box(70,158,340,54,C(10,17,27));
-      ui_box(70,158,340,3,C(193,155,80));
-      ui_text(139,163,"MEMBERSHIP APPROVED!",1.31f);
-      ui_text(155,177,"ANOTHER BALD BOSS!",1.13f);
+      /* Animated gold membership ceremony, rendered in lightweight UI quads. */
+      ui_box(68,117,344,101,C(185,132,52));
+      ui_box(72,121,336,93,C(18,27,36));
+      ui_box(77,126,326,19,C(129,90,37));
+      ui_box(77+(victory_frames/3)%320,122,3,88,C(100,79,46));
+      ui_text(142,132,"THE ELITE BALD MAN CLUB",1.0f);
+      ui_text(117,150,"MEMBERSHIP APPROVED!",1.37f);
+      ui_text(90,168,candidate_names[candidate_index],1.13f);
+      ui_text(265,168,"BALD BOSS!",1.10f);
       int stars=victory_stars();
-      for(int i=0;i<3;i++)ui_text(212+i*21,189,i<stars?"*":"-",1.45f);
+      for(int i=0;i<3;i++)ui_text(209+i*22,182,i<stars?"*":"-",1.55f);
       char result[48];
       if(zen_mode)snprintf(result,sizeof(result),"ZEN COMPLETE  SCORE %d",score);
       else snprintf(result,sizeof(result),"SCORE %d  TIME %02d:%02d",score,play_frames/3600,(play_frames/60)%60);
-      ui_text(94,202,result,.96f);
-      ui_text(343,202,"X REPLAY",.91f);
+      ui_text(119,200,result,1.02f);
+      ui_box(69,229,342,35,C(10,17,27));
+      ui_text(91,244,"X REPLAY   TRI NEXT   O LEVELS",1.0f);
     }else if(phase==3){
       ui_box(94,158,292,54,C(10,16,27));
       ui_box(94,158,292,3,C(193,155,80));
       ui_text(139,169,"MEMBERSHIP DENIED!",1.29f);
       ui_text(182,190,"TIME IS UP!",1.12f);
+      ui_box(103,229,274,32,C(10,17,27));
+      ui_text(136,241,"X RETRY   O LEVELS",1.0f);
     }
-    if(phase==3 && frame%90>45)ui_text(192,202,"X TO RESTART",1.15f);
     if(phase==1 && !paused){
       draw_last_hair_markers();
       draw_shavings();
