@@ -1,4 +1,4 @@
-/* The Elite Bald Man Club - PSP Edition v0.9.6 public rebrand new anatomical head, UV texture and crown pitch controls barber UI, restart and finish camera with Deep Voice soundtrack. Original homebrew source.
+/* Bald Elite - PSP Edition v0.9.7 short public title new anatomical head, UV texture and crown pitch controls barber UI, restart and finish camera with Deep Voice soundtrack. Original homebrew source.
    Uses PSPSDK GU/GUM hardware 3D renderer. No PS1 BIOS calls. */
 #include <pspkernel.h>
 #include <pspctrl.h>
@@ -12,7 +12,7 @@
 #include <string.h>
 #include <stdint.h>
 
-PSP_MODULE_INFO("Elite Bald Man Club", 0, 1, 0);
+PSP_MODULE_INFO("Bald Elite", 0, 1, 0);
 PSP_MAIN_THREAD_ATTR(THREAD_ATTR_USER | THREAD_ATTR_VFPU);
 
 #define SW 480
@@ -522,8 +522,8 @@ static void draw_ui(void){
   ui_box(0,220,SW,52,C(10,17,26));
   ui_box(0,269,SW,3,C(57,126,139));
   ui_box(9,7,5,29,C(193,155,80));
-  ui_text(19,9,"THE ELITE BALD MAN CLUB",1.50f);
-  ui_text(282,12,phase==0?"CLUB BARBER":"CLUB INITIATION",1.00f);
+  ui_text(19,9,"BALD ELITE",1.95f);
+  ui_text(180,12,phase==0?"THE ELITE BALD MAN CLUB":"CLUB INITIATION",1.00f);
   ui_text(419,8,music_enabled?"MUSIC":"MUTED",.93f);
   if(phase!=0){
     int finishing=phase==1 && n_hairs-removed>0 && n_hairs-removed<=12 && !finish_zoom_override;
