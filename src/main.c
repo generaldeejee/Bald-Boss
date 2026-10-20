@@ -1,4 +1,4 @@
-/* Bald Boss 3D - PSP Edition v0.9.5 melodic rock vocals and foreground mix new anatomical head, UV texture and crown pitch controls barber UI, restart and finish camera with Deep Voice soundtrack. Original homebrew source.
+/* The Elite Bald Man Club - PSP Edition v0.9.6 public rebrand new anatomical head, UV texture and crown pitch controls barber UI, restart and finish camera with Deep Voice soundtrack. Original homebrew source.
    Uses PSPSDK GU/GUM hardware 3D renderer. No PS1 BIOS calls. */
 #include <pspkernel.h>
 #include <pspctrl.h>
@@ -12,7 +12,7 @@
 #include <string.h>
 #include <stdint.h>
 
-PSP_MODULE_INFO("Bald Boss 3D PSP", 0, 1, 0);
+PSP_MODULE_INFO("Elite Bald Man Club", 0, 1, 0);
 PSP_MAIN_THREAD_ATTR(THREAD_ATTR_USER | THREAD_ATTR_VFPU);
 
 #define SW 480
@@ -522,8 +522,8 @@ static void draw_ui(void){
   ui_box(0,220,SW,52,C(10,17,26));
   ui_box(0,269,SW,3,C(57,126,139));
   ui_box(9,7,5,29,C(193,155,80));
-  ui_text(19,9,"BALD BOSS 3D",1.95f);
-  ui_text(195,12,phase==0?"THE ELITE BALD MAN CLUB":"CLUB INITIATION",1.00f);
+  ui_text(19,9,"THE ELITE BALD MAN CLUB",1.50f);
+  ui_text(282,12,phase==0?"CLUB BARBER":"CLUB INITIATION",1.00f);
   ui_text(419,8,music_enabled?"MUSIC":"MUTED",.93f);
   if(phase!=0){
     int finishing=phase==1 && n_hairs-removed>0 && n_hairs-removed<=12 && !finish_zoom_override;
@@ -535,7 +535,7 @@ static void draw_ui(void){
     ui_box(236,61,231,151,C(10,18,28));
     ui_box(236,61,3,151,C(193,155,80));
     ui_text(268,66,"CLUB BARBER\'S CHAIR",1.12f);
-    ui_text(249,85,"THE ELITE BALD MAN CLUB",1.06f);
+    ui_text(270,85,"YOUR MISSION",1.15f);
     ui_text(250,102,"ONLY TRULY BALD MEN MAY JOIN.",.92f);
     ui_text(250,114,"SHAVE THE APPLICANTS. TURN",.92f);
     ui_text(250,126,"THEM INTO BALD BOSSES!",.99f);
