@@ -38,6 +38,8 @@ jobs:
           python3 tools/generate_psp_music.py
           test -s src/voice_sample.h
           test -s src/music_samples.h
+      - name: Host C syntax and applicant gameplay regressions
+        run: python3 tools/syntax_check.py
       - name: Generate branded PSP XMB icon
         run: |
           python3 tools/generate_psp_icon.py
