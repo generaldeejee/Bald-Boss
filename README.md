@@ -1,6 +1,6 @@
-# Bald Boss 3D — PSP Edition v0.9.5 (public beta candidate)
+# The Elite Bald Man Club — PSP Edition v0.9.6 (public beta candidate)
 
-**Bald Boss 3D** is an original, humorous, native PlayStation Portable (PSP) homebrew game. You play the **Club Barber**: shave a rotating 3D head with an electric clipper and help applicants earn the title **Bald Boss**.
+**The Elite Bald Man Club** (formerly **Bald Boss 3D**) is an original, humorous native PlayStation Portable (PSP) homebrew game. You play the **Club Barber**: shave a rotating 3D head with an electric clipper and help applicants earn the honorary title **Bald Boss**.
 
 ### The Elite Bald Man Club
 
@@ -12,18 +12,26 @@ As the club's barber, your job is to transform hairy applicants into bona fide b
 
 | Name | Meaning |
 | --- | --- |
-| **Bald Boss 3D** | The name of the video game (and PSP EBOOT) |
-| **The Elite Bald Man Club** | The one and only fictional club |
+| **The Elite Bald Man Club** | Public title of the video game and PSP EBOOT, as well as the name of the fictional club |
+| **Bald Boss 3D** | Former project title; kept in the existing GitHub repository URL for link compatibility |
 | **Club Barber** | You, the player: the person who shaves applicants |
 | **Bald Boss** | The honorary rank of each newly accepted bald club member |
 | **Membership Approved!** | An applicant has been completely shaved and accepted |
 | **Membership Denied!** | The applicant failed the timed Challenge; Zen Mode has no timeout |
 
-In the title screen, the barber's workspace is called **Club Barber's Chair**, not a second business or club. **“Another bald boss!”** refers to the newly admitted member, not a new club name.
+In the title screen, the barber's workspace is called **Club Barber's Chair**, not a second business or club. **“Another bald boss!”** refers to a newly admitted member, **not** the name of the game. The game and the club now share the name **The Elite Bald Man Club**.
 
 Built in C with the open-source PSPDEV/PSPSDK toolchain and PSP GU/GUM rendering. It is **not** a PS1 executable and needs **no PS1 BIOS**.
 
-## What's new in v0.9.5
+## What's new in v0.9.6
+
+- **Public rebrand (v0.9.6):** the game, main menu, PSP module, EBOOT display title and new GitHub Actions build artifacts are now **The Elite Bald Man Club**. **Bald Boss** remains the earned rank of admitted members, and the spoken victory line **“Another bald boss!”** is unchanged. The music and gameplay remain the same.
+- **Brand-new PSP XMB icon:** the build runs `python3 tools/generate_psp_icon.py` to replace the old pre-release icon with an original 144×80 image carrying **THE ELITE / BALD MAN / CLUB**. This generated icon is added to the PSP build. The source PNG still in the Git checkout is superseded by the generated one during the build.
+- **Installation:** the suggested PSP folder is `PSP/GAME/ELITEBALD/EBOOT.PBP`. A different folder name can also work: the EBOOT title, rather than the folder name, controls the displayed title.
+- **Name search:** a public web search did not reveal an obvious identically titled game as of October 2026. That is **not** a trademark clearance. Please check BOIP and EUIPO/TMview before wide-scale release.
+
+### Previous improvements — v0.9.5
+
 
 - **Melodic menu singing (v0.9.5):** **"No Hair, No Fear!"** now has a *composed E-minor melodic lead* instead of monotone spoken-rock narration. Piper's neural male voice is re-pitched note by note with [Praat/Parselmouth](https://parselmouth.readthedocs.io/) TD-PSOLA so voiced syllables carry musical notes, natural-speed consonants and subtle vibrato. This is **synthetic singing**, not a recording of a professional human rock singer, and still has that limitation.
 - **Lyrics easy to hear:** a vocal-forward mix boosts the sung lead and smoothly ducks the guitars, drums and synthesizer by up to roughly 9 dB while the singer is active. That ducking is **only on the title and results song**; the standalone instrumental during the shaving challenge is unchanged.
@@ -82,18 +90,18 @@ Download the compiled **EBOOT.PBP** from the [GitHub Actions build page](https:/
 
 **PPSSPP emulator:** open **EBOOT.PBP** using *Load*.
 
-**Physical PSP:** use a homebrew-capable PSP, create the folder `/PSP/GAME/BALDBOSS/` on the Memory Stick, and copy the file as `/PSP/GAME/BALDBOSS/EBOOT.PBP`. Launch it from the PSP Game menu.
+**Physical PSP:** use a homebrew-capable PSP, create the folder `/PSP/GAME/ELITEBALD/` on the Memory Stick, and copy the file as `/PSP/GAME/ELITEBALD/EBOOT.PBP`. Launch it from the PSP Game menu.
 
 A **GitHub Actions artifact is not a permanent public release**. For a public homebrew-site submission, attach a tested installation ZIP to a proper GitHub Release rather than directing users to a short-lived Actions artifact.
 
 ## Building from source
 
-The GitHub workflow [Build PSP EBOOT](https://github.com/generaldeejee/Bald-Boss/actions) generates its audio data and compiles the game. It is triggered automatically for relevant code/asset changes, or manually through *Run workflow*.
+The GitHub workflow [Build Elite Bald Man Club PSP](https://github.com/generaldeejee/Bald-Boss/actions) generates its audio data and custom PSP icon, then compiles the game. It is triggered automatically for relevant code/asset changes, or manually through *Run workflow*.
 
 For a local PSPSDK installation, install the free **piper-tts==1.3.0** build-time package along with NumPy and SciPy. The speech model is about 63.5 MB and is cached only on the build computer:
 
 ```sh
-python3 -m pip install numpy scipy soundfile piper-tts==1.3.0 praat-parselmouth==0.4.7
+python3 -m pip install numpy scipy soundfile pillow piper-tts==1.3.0 praat-parselmouth==0.4.7
 ```
 
 The Piper model is downloaded and SHA-256-verified automatically by the announcer generator. If model download fails, the normal build stops rather than silently substituting robotic speech.
@@ -103,10 +111,11 @@ For a local PSPSDK installation:
 ```sh
 python3 tools/generate_voice.py
 python3 tools/generate_psp_music.py
+python3 tools/generate_psp_icon.py
 make
 ```
 
-The audio generators require their documented Python dependencies (NumPy, SciPy and SoundFile for the music workflow) and ffmpeg/eSpeak where used. You may alternatively follow `.github/workflows/build-psp.yml` for the exact dependencies and use the `pspdev/pspdev` toolchain container.
+The audio generators require their documented Python dependencies (NumPy, SciPy, SoundFile and Praat/Parselmouth for the music workflow), with Pillow for the branded PSP icon and ffmpeg/eSpeak where used. You may alternatively follow `.github/workflows/build-psp.yml` for the exact dependencies and use the `pspdev/pspdev` toolchain container.
 
 The game renders at **480×272**, uses its own PSP GU/GUM renderer, and generates the head mesh and base face texture on startup.
 
@@ -130,9 +139,9 @@ Before publishing a download on a homebrew site, verify:
 - [ ] The victory orbit, stars, score and announcer behave properly after the win.
 - [ ] Test on physical PSP hardware if available, especially PSP-1000 (lower memory), or clearly state if only PPSSPP was tested.
 - [ ] Take genuine in-game screenshots and include them in a GitHub Release.
-- [ ] Publish a ZIP containing `PSP/GAME/BALDBOSS/EBOOT.PBP` with version, changelog and license.
+- [ ] Publish a ZIP containing `PSP/GAME/ELITEBALD/EBOOT.PBP`, the rebranded 144×80 icon, version, changelog and license.
 
-**Verification status:** Source-level checks and a local TD-PSOLA melody-conversion smoke test have been performed for v0.9.5. The complete song generated with Piper, audibility in the PSP mono mix, and the PSPDEV/PPSSPP build still require verification. Do not advertise this edition as studio-quality recorded rock singing. The Piper neural voice generator and changed PSP sample rate still need confirmation from the GitHub Actions build and a PPSSPP listening test. A successful PSPDEV cross-compilation, PPSSPP playthrough of v0.9.0 and physical PSP testing still need confirmation. Do not label this build “fully tested on PSP” until it has been verified.
+**Verification status:** Source-level checks have been performed for v0.9.6; the rebranded XMB icon, the PSPDEV build and end-to-end emulator or physical PSP runs must still be verified. The older musical smoke test applies to v0.9.5. The complete song generated with Piper, audibility in the PSP mono mix, and the PSPDEV/PPSSPP build still require verification. Do not advertise this edition as studio-quality recorded rock singing. The Piper neural voice generator and changed PSP sample rate still need confirmation from the GitHub Actions build and a PPSSPP listening test. A successful PSPDEV cross-compilation, PPSSPP playthrough of v0.9.0 and physical PSP testing still need confirmation. Do not label this build “fully tested on PSP” until it has been verified.
 
 ## Reporting issues
 
