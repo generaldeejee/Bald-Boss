@@ -13,15 +13,15 @@ with tempfile.TemporaryDirectory() as temp:
   '#define PSP_MAIN_THREAD_ATTR(a)',
   '#define THREAD_ATTR_USER 1',
   '#define THREAD_ATTR_VFPU 2']
- for c in sorted(set(re.findall(r'\bGU_[A-Z][A-Z_0-9]*\b|\bPSP_CTRL_[A-Z_]+\b',src))):
+ for c in sorted(set(re.findall(r'\bGU_[A-Z][A-Z_0-9]*\b|\bPSP_(?:CTRL|AUDIO)_[A-Z_0-9]+\b',src))):
   h.append('#define '+c+' '+str(len(h)%999 + 1))
  names=sorted(set(re.findall(r'\b(sce[A-Za-z0-9_]+)\s*\(',src)))
  for name in names:
   if name in ('sceGuGetMemory',):h.append('void *'+name+'();')
-  elif name in ('sceKernelCreateThread','sceKernelCreateCallback',):h.append('int '+name+'();')
+  elif name in ('sceKernelCreateThread','sceKernelCreateCallback','sceAudioChReserve','sceAudioOutputBlocking',):h.append('int '+name+'();')
   else:h.append('void '+name+'();')
  (p/'shim.h').write_text('\n'.join(h)+'\n')
- for name in ['pspkernel.h','pspctrl.h','pspdisplay.h','pspgu.h','pspgum.h']:
+ for name in ['pspkernel.h','pspctrl.h','pspdisplay.h','pspgu.h','pspgum.h','pspaudio.h']:
   (p/name).write_text('#include "shim.h"\n')
  cmd=['gcc','-std=gnu99','-O1','-fsyntax-only','-Wall','-Wextra','-Wno-unused-function','-I',str(p),str(root/'src/main.c')]
  res=subprocess.run(cmd,text=True,capture_output=True)
