@@ -76,14 +76,15 @@ Built in C with the open-source PSPDEV/PSPSDK toolchain and PSP GU/GUM rendering
 | 90 Seconds Challenge | Shave every strand before the timer expires | 90 seconds initially; a cleanup-time bonus near the end | 3 stars for finishing with a displayed time of 50 seconds or less elapsed, 2 for 75 seconds or less, otherwise 1 |
 | Zen Mode | Shave at your own pace | No time limit; elapsed time is displayed | 3 stars on completion (speed is not scored) |
 
-The last-hair locator and close-up assistance work in **both** modes.
+The last-hair locator and close-up assistance work in **both** modes, with all three applicants. Candidate selection is integrated into the title screen (there is no separate loading screen).
 
 ## PSP controls
 
 | Control | Action |
 | --- | --- |
+| **D-pad Left/Right** on title screen | Choose The Businessman, The Punk, or The Professor |
 | **D-pad Up/Down** on title screen | Choose Challenge or Zen Mode |
-| **X** on title screen | Start the selected mode |
+| **X** on title screen | Start shaving the selected applicant in the selected mode |
 | **Triangle** on title screen | Open controls tutorial |
 | **D-pad / analog stick** in-game | Move the clipper |
 | **Hold X or Square** | Shave the hair under the clipper; quick movement shaves across the travelled path |
@@ -96,7 +97,9 @@ The last-hair locator and close-up assistance work in **both** modes.
 | **Up/Down, X** in pause menu | Choose Resume, Restart Run, Return to Title, or How to Play |
 | **Circle** in pause menu | Return to gameplay |
 | **X or Circle** in tutorial | Close tutorial |
-| **X** on victory / timeout | Play again in the currently selected mode |
+| **X** on victory / timeout | Retry the same applicant in the selected mode |
+| **Triangle** on victory | Start the next applicant using the selected mode |
+| **Circle** on victory / timeout | Return to title and applicant selection |
 | **HOME** on physical PSP | System exit menu |
 
 The game uses on-screen tracking markers to help you find the last hairs and stops the Challenge clock when only **one hair** remains.
@@ -158,7 +161,7 @@ Before publishing a download on a homebrew site, verify:
 - [ ] Take genuine in-game screenshots and include them in a GitHub Release.
 - [ ] Publish a ZIP containing `PSP/GAME/BALDELITE/EBOOT.PBP`, the rebranded 144×80 icon, version, changelog and license.
 
-**Verification status:** Source-level checks have been performed for v0.9.7; the rebranded XMB icon, the PSPDEV build and end-to-end emulator or physical PSP runs must still be verified. The older musical smoke test applies to v0.9.5. The complete song generated with Piper, audibility in the PSP mono mix, and the PSPDEV/PPSSPP build still require verification. Do not advertise this edition as studio-quality recorded rock singing. The Piper neural voice generator and changed PSP sample rate still need confirmation from the GitHub Actions build and a PPSSPP listening test. A successful PSPDEV cross-compilation, PPSSPP playthrough of v0.9.0 and physical PSP testing still need confirmation. Do not label this build “fully tested on PSP” until it has been verified.
+**Verification status:** Source-level checks have been performed for v0.9.8; the rebranded XMB icon, the PSPDEV build and end-to-end emulator or physical PSP runs must still be verified. The older musical smoke test applies to v0.9.5. The complete song generated with Piper, audibility in the PSP mono mix, and the PSPDEV/PPSSPP build still require verification. Do not advertise this edition as studio-quality recorded rock singing. The Piper neural voice generator and changed PSP sample rate still need confirmation from the GitHub Actions build and a PPSSPP listening test. A successful PSPDEV cross-compilation, PPSSPP playthrough of v0.9.0 and physical PSP testing still need confirmation. Do not label this build “fully tested on PSP” until it has been verified.
 
 ## Reporting issues
 
