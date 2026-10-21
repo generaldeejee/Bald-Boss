@@ -24,6 +24,13 @@ The title screen now doubles as the **applicant and mode selector**. The Club Ba
 
 Built in C with the open-source PSPDEV/PSPSDK toolchain and PSP GU/GUM rendering. It is **not** a PS1 executable and needs **no PS1 BIOS**.
 
+## Experimental Nintendo 3DS port
+
+A **separate native 3DS prototype** is now being developed under [`3ds/`](3ds/README.md), using devkitARM, libctru and citro3d. Its **first milestone** renders a Bald Elite 3D head and three selectable hairstyles on the 3DS top screen, with applicant information and controls on the bottom screen. It builds independently to a **`.3dsx`**, without affecting the PSP EBOOT.
+
+The 3DS version is **not yet a complete game**: clipping, scoring, audio and the club victory ceremony remain PSP-only for now. The new [3DS build workflow](https://github.com/generaldeejee/Bald-Boss/actions/workflows/build-3ds.yml) will expose downloadable artifacts after successful toolchain compilation. **A full 3DS build and emulator/hardware test have not yet been independently verified.**
+
+
 ## What's new in v0.9.8
 
 - **Three playable applicants:** choose **The Businessman** (neat short haircut; easy), **The Punk** (tall pink mohawk; hard) or **The Professor** (sparse silver side hair; tricky). They use the same PSP-friendly face/head mesh, with distinct hair distributions, lengths, colors and outfits; there are no heavy extra character models.
