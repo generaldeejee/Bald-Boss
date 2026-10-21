@@ -1,0 +1,43 @@
+name: Build Bald Elite Nintendo 3DS
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "3ds/**"
+      - ".github/workflows/build-3ds.yml"
+
+jobs:
+  mesh-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile portable 3DS head and hairstyles with host GCC
+        run: |
+          gcc -std=c99 -O2 -Wall -Wextra -Werror \
+            3ds/tests/test_mesh.c 3ds/source/mesh.c -lm -o /tmp/bald-elite-3ds-mesh-test
+          /tmp/bald-elite-3ds-mesh-test
+
+  build-3ds:
+    needs: mesh-test
+    runs-on: ubuntu-latest
+    container:
+      image: devkitpro/devkitarm:20260610
+    steps:
+      - uses: actions/checkout@v4
+      - name: Confirm 3DS SDK and shader assembler
+        run: |
+          test -n "${DEVKITARM}"
+          test -f "${DEVKITARM}/3ds_rules"
+          command -v picasso
+      - name: Build first native Bald Elite 3DS homebrew
+        run: make -C 3ds -j2
+      - name: Check 3DS Homebrew Launcher executable
+        run: test -s 3ds/bald_elite_3ds.3dsx
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BaldElite-3DS-Prototype
+          path: |
+            3ds/bald_elite_3ds.3dsx
+            3ds/bald_elite_3ds.smdh
+          if-no-files-found: error
