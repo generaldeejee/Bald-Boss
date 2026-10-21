@@ -19,7 +19,6 @@ const char *be_candidate_names[BE_CANDIDATES]={
 static uint32_t seed;
 static uint32_t rand32(void){seed=seed*1664525u+1013904223u;return seed;}
 static float rnd(void){return (float)((rand32()>>8)&65535u)/65535.0f;}
-static float sq(float x){return x*x;}
 static float gauss(float x){return expf(-x*x);}
 
 static float linear(float y,const float *values){
