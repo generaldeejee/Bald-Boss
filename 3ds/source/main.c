@@ -1,35 +1,20 @@
-/* Bald Elite for the Nintendo 3DS - playable arcade edition.
- * Original 3DS (not New 3DS only), citro3d top screen, stable bottom console.
- * PSP build is a separate, unchanged target.
+/* Bald Elite 3DS v1.2 - stability recovery for ORIGINAL 3DS.
+ * Keep gameplay, touch input and audio, but avoid all PICA200 shader draws.
+ * Use libctru's double-buffered top CPU framebuffer instead.
  */
 #include <3ds.h>
-#include <citro3d.h>
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
 #include <math.h>
-
 #include "mesh.h"
 #include "game.h"
 #include "audio.h"
 #include "save.h"
-#include "vshader_shbin.h"
+#include "render_soft.h"
 
-#define BG_COLOR 0x142537FF
-#define DISPLAY_FLAGS (GX_TRANSFER_FLIP_VERT(0) | \
- GX_TRANSFER_OUT_TILED(0) | GX_TRANSFER_RAW_COPY(0) | \
- GX_TRANSFER_IN_FORMAT(GX_TRANSFER_FMT_RGBA8) | \
- GX_TRANSFER_OUT_FORMAT(GX_TRANSFER_FMT_RGB8) | \
- GX_TRANSFER_SCALING(GX_TRANSFER_SCALE_NO))
-
-static BeMesh scene;                  /* static: avoid 3DS stack overflow */
+static BeMesh scene;
 static BeGame game;
-static BeVertex *head_vbo=NULL,*hair_vbo=NULL;
-static DVLB_s *vshader=NULL;
-static shaderProgram_s program;
-static bool program_ready=false;
-static C3D_Mtx projection,overlay_projection;
-static int loc_projection=-1,loc_modelview=-1;
 static bool sound_available=false;
 static bool sound_enabled=true;
 static int last_audio_phase=BE_TITLE;
@@ -183,172 +168,16 @@ static void status_display(void){
     status_row(25,"  TOUCHSCREEN = CLIPPER PAD");
     status_row(26,"  PSP AND 3DS EDITIONS ARE SEPARATE");
     status_row(27,"");
-    status_row(28,sound_available?"  ARCADE v1.1  |  DSP AUDIO":"  ARCADE v1.1  |  SILENT MODE");
+    status_row(28,sound_available?"  SAFE v1.2  |  DSP AUDIO":"  SAFE v1.2  |  SILENT MODE");
     status_present();
 }
 
-/* Upload current game-owned mesh. The game rules already regenerate on
- * selection/start; NEVER re-generate here or the cut state disappears.
- * Head colour data changes on every polished shave patch. */
-static void upload_mesh(bool generate){
-    (void)generate;
-    memcpy(head_vbo,scene.head,scene.head_count*sizeof(BeVertex));
-    GSPGPU_FlushDataCache(head_vbo,scene.head_count*sizeof(BeVertex));
-    memcpy(hair_vbo,scene.hair,scene.hair_count*6*sizeof(BeVertex));
-    GSPGPU_FlushDataCache(hair_vbo,scene.hair_count*6*sizeof(BeVertex));
-}
-static bool scene_init(void){
-    head_vbo=linearAlloc(sizeof(scene.head));
-    hair_vbo=linearAlloc(sizeof(scene.hair));
-    if(!head_vbo||!hair_vbo)return false;
-    vshader=DVLB_ParseFile((u32*)vshader_shbin,vshader_shbin_size);
-    if(!vshader)return false;
-    shaderProgramInit(&program);
-    program_ready=true;
-    shaderProgramSetVsh(&program,&vshader->DVLE[0]);
-    C3D_BindProgram(&program);
-    loc_projection=shaderInstanceGetUniformLocation(program.vertexShader,"projection");
-    loc_modelview=shaderInstanceGetUniformLocation(program.vertexShader,"modelView");
-    if(loc_projection<0||loc_modelview<0)return false;
 
-    C3D_AttrInfo *attribs=C3D_GetAttrInfo();
-    AttrInfo_Init(attribs);
-    AttrInfo_AddLoader(attribs,0,GPU_FLOAT,3);
-    AttrInfo_AddLoader(attribs,1,GPU_FLOAT,4);
-
-    C3D_TexEnv *env=C3D_GetTexEnv(0);
-    C3D_TexEnvInit(env);
-    C3D_TexEnvSrc(env,C3D_Both,GPU_PRIMARY_COLOR,0,0);
-    C3D_TexEnvFunc(env,C3D_Both,GPU_REPLACE);
-    Mtx_PerspTilt(&projection,C3D_AngleFromDegrees(50.0f),
-                  C3D_AspectRatioTop,.1f,40.0f,false);
-    Mtx_OrthoTilt(&overlay_projection,0.0f,400.0f,240.0f,0.0f,
-                   0.0f,1.0f,true);
-    upload_mesh(true);
-    return true;
-}
-
-/* Immediate-mode screen overlay. Shares the same color shader and avoids
- * external textures/font dependencies on the original 3DS. */
-static void screen_vertex(float x,float y,float r,float g,float b){
-    C3D_ImmSendAttrib(x,y,.5f,0);
-    C3D_ImmSendAttrib(r,g,b,1);
-}
-static void screen_rect(float x,float y,float w,float h,float r,float g,float b){
-    C3D_ImmDrawBegin(GPU_TRIANGLES);
-    screen_vertex(x,y,r,g,b);screen_vertex(x+w,y,r,g,b);screen_vertex(x,y+h,r,g,b);
-    screen_vertex(x+w,y,r,g,b);screen_vertex(x+w,y+h,r,g,b);screen_vertex(x,y+h,r,g,b);
-    C3D_ImmDrawEnd();
-}
-/* Lightweight shaving fragments rendered on the top LCD. No sprites, texture
- * allocations or external assets needed on the original Nintendo 3DS. */
-#define BE_PARTICLES 28
-typedef struct {float x,y,vx,vy;unsigned life;} BeParticle;
-static BeParticle shavings[BE_PARTICLES];
-static unsigned shaving_cursor=0,shaving_seed=0xB01D2026;
-static float shaving_rand(void){
-    shaving_seed=shaving_seed*1664525u+1013904223u;
-    return (float)((shaving_seed>>12)&4095u)/4095.0f;
-}
-static void shaving_emit(float x,float y,int hit){
-    int count=hit<4?hit*2:8;
-    for(int i=0;i<count;i++){
-        BeParticle *p=&shavings[shaving_cursor++%BE_PARTICLES];
-        p->x=x+(shaving_rand()-.5f)*22.0f;
-        p->y=y+(shaving_rand()-.5f)*13.0f;
-        p->vx=(shaving_rand()-.5f)*3.4f;
-        p->vy=-1.5f-shaving_rand()*2.2f;
-        p->life=21+(unsigned)(shaving_rand()*15.0f);
-    }
-}
-static void shaving_draw(void){
-    for(int i=0;i<BE_PARTICLES;i++){
-        BeParticle *p=&shavings[i];
-        if(!p->life)continue;
-        p->x+=p->vx;p->y+=p->vy;p->vy+=.14f;
-        p->life--;
-        if(p->x<2||p->x>398||p->y<3||p->y>231)continue;
-        float bright=p->life>12?.82f:(float)p->life/16.0f;
-        screen_rect(p->x,p->y,2.8f,1.9f,
-                    .62f*bright,.38f*bright,.20f*bright);
-    }
-}
-static void overlay_draw(void){
-    C3D_Mtx identity;
-    Mtx_Identity(&identity);
-    C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER,loc_projection,&overlay_projection);
-    C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER,loc_modelview,&identity);
-    C3D_DepthTest(false,GPU_ALWAYS,GPU_WRITE_ALL);
-    screen_rect(0,0,400,12,.05f,.10f,.15f);
-    screen_rect(0,0,400,3,.75f,.57f,.20f);
-    if(game.phase==BE_PLAY){
-        float p=(float)be_game_percentage(&game)*4.0f;
-        screen_rect(0,232,400,8,.07f,.13f,.20f);
-        screen_rect(0,232,p,8,.26f,.82f,.63f);
-        float x=game.cursor_x,y=game.cursor_y;
-        screen_rect(x-14,y-1,28,2,.97f,.80f,.30f);
-        screen_rect(x-1,y-14,2,28,.97f,.80f,.30f);
-        screen_rect(x-3,y-3,6,6,.18f,.85f,.76f);
-        /* Distinctive two-tone electric barber clipper below the sight line. */
-        screen_rect(x-10,y+16,20,26,.18f,.25f,.30f);
-        screen_rect(x-8,y+18,16,20,.38f,.45f,.46f);
-        screen_rect(x-11,y+12,22,7,.73f,.76f,.75f);
-        screen_rect(x-12,y+11,24,2,.94f,.81f,.49f);
-        /* The PSP's final-hair guidance, now in 3DS projected coordinates. */
-        int remaining=scene.hair_count-scene.removed;
-        if(remaining>0 && remaining<=12){
-            for(int i=0;i<scene.hair_count;i++){
-                const BeHair *h=&scene.strands[i];
-                float hx,hy;
-                if(h->gone || !be_game_project(&game,h,&hx,&hy))continue;
-                screen_rect(hx-6,hy-5,12,1,.13f,.94f,.90f);
-                screen_rect(hx-6,hy+5,12,1,.13f,.94f,.90f);
-            }
-        }
-        shaving_draw();
-        if(game.paused){
-            screen_rect(90,85,220,7,.65f,.51f,.22f);
-            screen_rect(90,155,220,7,.65f,.51f,.22f);
-        }
-    }else if(game.phase==BE_WIN){
-        screen_rect(25,194,350,28,.72f,.52f,.15f);
-        screen_rect(31,200,338,16,.92f,.75f,.32f);
-        int stars=be_game_stars(&game);
-        for(int i=0;i<stars;i++)screen_rect(164+i*30,205,17,8,.99f,.98f,.75f);
-    }else if(game.phase==BE_FAIL){
-        screen_rect(45,207,310,12,.66f,.14f,.14f);
-    }else{
-        screen_rect(78,225,244,5,.74f,.54f,.20f);
-    }
-    C3D_DepthTest(true,GPU_GEQUAL,GPU_WRITE_ALL);
-}
-
-static void scene_draw(void){
-    C3D_Mtx view;
-    Mtx_Identity(&view);
-    Mtx_Translate(&view,0.0f,-.06f,-be_game_distance(&game),true);
-    Mtx_RotateX(&view,game.pitch,true);
-    Mtx_RotateY(&view,game.yaw,true);
-    C3D_BindProgram(&program);
-    C3D_DepthTest(true,GPU_GEQUAL,GPU_WRITE_ALL);
-    C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER,loc_projection,&projection);
-    C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER,loc_modelview,&view);
-    C3D_BufInfo *buffers=C3D_GetBufInfo();
-    BufInfo_Init(buffers);
-    BufInfo_Add(buffers,head_vbo,sizeof(BeVertex),2,0x10);
-    C3D_DrawArrays(GPU_TRIANGLES,0,scene.head_count);
-    BufInfo_Init(buffers);
-    BufInfo_Add(buffers,hair_vbo,sizeof(BeVertex),2,0x10);
-    C3D_DrawArrays(GPU_TRIANGLES,0,scene.hair_count*6);
-    overlay_draw();
-}
-static void scene_shutdown(void){
-    if(program_ready)shaderProgramFree(&program);
-    if(vshader)DVLB_Free(vshader);
-    if(head_vbo)linearFree(head_vbo);
-    if(hair_vbo)linearFree(hair_vbo);
-}
-
+/* Keep compatibility with the existing gameplay input controller. Mesh
+ * mutations happen in game.c and appear on the top LCD the next frame;
+ * no GPU VBO upload or command-buffer synchronisation is needed. */
+static void upload_mesh(bool ignored){(void)ignored;}
+static void shaving_emit(float x,float y,int count){be_soft_emit(x,y,count);}
 static float clip(float x,float low,float high){
     return x<low?low:(x>high?high:x);
 }
@@ -435,33 +264,20 @@ static bool process_input(void){
     be_game_tick(&game);
     return true;
 }
+
 int main(void){
     gfxInitDefault();
-    /* Console draws only dirty lines. Single buffering prevents alternating
-       old/new bottom-screen framebuffers while Citro3D swaps the top. */
-    gfxSetDoubleBuffering(GFX_BOTTOM,false);
+    gfxSetDoubleBuffering(GFX_TOP,true);
+    /* consoleInit sets bottom RGB565 single-buffered and keeps its framebuffer. */
     consoleInit(GFX_BOTTOM,NULL);
-    /* Single buffered text never alternates with an uninitialised second LCD
-       framebuffer; explicitly present it before any GPU frames are rendered. */
-    gfxScreenSwapBuffers(GFX_BOTTOM,false);
-    status_invalidate();
     be_game_init(&game,&scene);
     be_save_load(&game);
-    if(!C3D_Init(C3D_DEFAULT_CMDBUF_SIZE)){
-        printf("Citro3D could not initialize.\n");
-        gfxExit();return 1;
-    }
-    C3D_RenderTarget *target=C3D_RenderTargetCreate(
-        240,400,GPU_RB_RGBA8,GPU_RB_DEPTH24_STENCIL8);
-    if(!target){
-        printf("Unable to create 3DS GPU target.\n");
-        C3D_Fini();gfxExit();return 1;
-    }
-    C3D_RenderTargetSetOutput(target,GFX_TOP,GFX_LEFT,DISPLAY_FLAGS);
-    if(!scene_init()){
-        printf("Failed to initialize Bald Elite 3DS.\n");
-        scene_shutdown();C3D_Fini();gfxExit();return 1;
-    }
+    status_invalidate();
+    /* Draw a real top frame even before the first gameplay/input iteration. */
+    be_soft_draw(&scene,&game);
+    gfxFlushBuffers();
+    gfxScreenSwapBuffers(GFX_TOP,false);
+    gspWaitForVBlank();
     sound_available=be_audio_init();
     while(aptMainLoop()){
         if(!process_input())break;
@@ -469,21 +285,19 @@ int main(void){
             if(last_audio_phase!=BE_WIN && game.phase==BE_WIN)be_audio_victory();
             u32 held=hidKeysHeld();
             bool shaving=game.phase==BE_PLAY && !game.paused &&
-                         ((held&KEY_A)||(held&KEY_TOUCH));
+                        ((held&KEY_A)||(held&KEY_TOUCH));
             be_audio_update(sound_enabled,shaving);
         }
         if(last_audio_phase!=BE_WIN && game.phase==BE_WIN)be_save_write(&game);
         last_audio_phase=game.phase;
         status_display();
-        C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
-        C3D_RenderTargetClear(target,C3D_CLEAR_ALL,BG_COLOR,0);
-        C3D_FrameDrawOn(target);
-        scene_draw();
-        C3D_FrameEnd(0);
+        be_soft_draw(&scene,&game);
+        gfxFlushBuffers();
+        /* Swap TOP ONLY. Never swap the bottom console's backing buffer. */
+        gfxScreenSwapBuffers(GFX_TOP,false);
+        gspWaitForVBlank();
     }
     if(sound_available)be_audio_shutdown();
-    scene_shutdown();
-    C3D_Fini();
     gfxExit();
     return 0;
 }
