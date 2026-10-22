@@ -198,7 +198,7 @@ void be_mesh_rebuild_hair(BeMesh *m){
         float tipx=x+h->nx*len,tipy=y+len*.70f,tipz=z+h->nz*len;
         if(h->gone){tipx=x;tipy=y;tipz=z;width=0.0f;}
         BeVertex a={x-tx*width,y,z-tz*width,color[m->candidate][0],color[m->candidate][1],color[m->candidate][2],1,0,0};
-        BeVertex b={x+tx*width,y,z+tz*width,color[m->candidate][0],color[m->candidate][1],color[m->candidate][2],1};
+        BeVertex b={x+tx*width,y,z+tz*width,color[m->candidate][0],color[m->candidate][1],color[m->candidate][2],1,0,0};
         BeVertex c={tipx,tipy,tipz,MIN(1.0f,color[m->candidate][0]*1.12f),
                     MIN(1.0f,color[m->candidate][1]*1.12f),
                     MIN(1.0f,color[m->candidate][2]*1.12f),1,0,0};
