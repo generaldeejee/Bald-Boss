@@ -14,7 +14,7 @@ DATA :=
 INCLUDES := source
 
 APP_TITLE := Bald Elite
-APP_DESCRIPTION := Native 3DS playable barber arcade beta
+APP_DESCRIPTION := Bald Elite 3DS v1.2 safe CPU renderer
 APP_AUTHOR := generaldeejee
 ARCH := -march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft
 CFLAGS := -g -Wall -Wextra -O2 -mword-relocations -ffunction-sections $(ARCH)
@@ -22,7 +22,7 @@ CFLAGS += $(INCLUDE) -D__3DS__ -std=gnu99
 CXXFLAGS := $(CFLAGS) -fno-rtti -fno-exceptions
 ASFLAGS := -g $(ARCH)
 LDFLAGS = -specs=3dsx.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
-LIBS := -lcitro3d -lctru -lm
+LIBS := -lctru -lm
 LIBDIRS := $(CTRULIB)
 
 ifneq ($(BUILD),$(notdir $(CURDIR)))
@@ -31,7 +31,7 @@ export TOPDIR := $(CURDIR)
 export VPATH := $(foreach dir,$(SOURCES),$(CURDIR)/$(dir))
 export DEPSDIR := $(CURDIR)/$(BUILD)
 CFILES := $(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c)))
-PICAFILES := $(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.v.pica)))
+PICAFILES :=
 export OFILES_SOURCES := $(CFILES:.c=.o)
 export OFILES_BIN := $(PICAFILES:.v.pica=.shbin.o)
 export LD := $(CC)
