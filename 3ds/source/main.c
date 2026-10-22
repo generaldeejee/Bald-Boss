@@ -42,6 +42,21 @@ static char old_row[STATUS_ROWS+1][STATUS_COLS+1];
 /* Coalesce console changes to ten refreshes/sec instead of doing formatted
    text output on every GPU frame. Phase/selection switches remain instant. */
 static int status_epoch=0;
+static bool status_dirty=false;
+/* Console writes pixels into CPU memory. Flush the BOTTOM framebuffer after
+ * the complete batch of changed rows so the LCD never sees stale cache lines.
+ * This is independent of the Citro3D TOP-screen render target. */
+static void status_present(void){
+    if(!status_dirty)return;
+    fflush(stdout);
+    u16 width=0,height=0;
+    u8 *framebuffer=gfxGetFramebuffer(GFX_BOTTOM,GFX_LEFT,&width,&height);
+    if(framebuffer){
+        u32 bpp=(gfxGetScreenFormat(GFX_BOTTOM)==GSP_BGR8_OES)?3u:2u;
+        GSPGPU_FlushDataCache(framebuffer,(u32)width*(u32)height*bpp);
+    }
+    status_dirty=false;
+}
 static void status_invalidate(void){
     memset(old_row,0,sizeof(old_row));
     status_epoch++;
@@ -57,6 +72,7 @@ static void status_row(int line,const char *format,...){
     if(strcmp(old_row[line],display)==0)return;
     strcpy(old_row[line],display);
     printf("\x1b[%d;1H%s",line,display);
+    status_dirty=true;
 }
 static void status_display(void){
     /* Update console text at 10 Hz, and immediately on a mode/phase change.
@@ -167,8 +183,8 @@ static void status_display(void){
     status_row(25,"  TOUCHSCREEN = CLIPPER PAD");
     status_row(26,"  PSP AND 3DS EDITIONS ARE SEPARATE");
     status_row(27,"");
-    status_row(28,sound_available?"  ARCADE BUILD  |  DSP AUDIO":"  ARCADE BUILD  |  SILENT MODE");
-    fflush(stdout);
+    status_row(28,sound_available?"  ARCADE v1.1  |  DSP AUDIO":"  ARCADE v1.1  |  SILENT MODE");
+    status_present();
 }
 
 /* Upload current game-owned mesh. The game rules already regenerate on
@@ -425,6 +441,9 @@ int main(void){
        old/new bottom-screen framebuffers while Citro3D swaps the top. */
     gfxSetDoubleBuffering(GFX_BOTTOM,false);
     consoleInit(GFX_BOTTOM,NULL);
+    /* Single buffered text never alternates with an uninitialised second LCD
+       framebuffer; explicitly present it before any GPU frames are rendered. */
+    gfxScreenSwapBuffers(GFX_BOTTOM,false);
     status_invalidate();
     be_game_init(&game,&scene);
     be_save_load(&game);
