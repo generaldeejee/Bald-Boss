@@ -76,7 +76,7 @@ static void status_display(void){
         status_row(13,"  LEFT/RIGHT  another applicant");
         status_row(14,"  UP / DOWN  change game mode");
         status_row(15,"  A or X     START SHAVING!");
-        status_row(16,"");
+        status_row(16,"  SELECT     toggle music");
         status_row(17,"  L/R        preview rotation");
         status_row(18,"  START      quit Homebrew");
         status_row(19,"");
@@ -108,7 +108,7 @@ static void status_display(void){
         status_row(11,"  %s %02d:%02d",game.mode==BE_ZEN?"ELAPSED":"TIME LEFT",
                    be_game_time_seconds(&game)/60,be_game_time_seconds(&game)%60);
         status_row(12,"  COMBO %d",game.combo);
-        status_row(13,"");
+        status_row(13,"  X  ZOOM %d/3   SELECT %s",game.zoom+1,sound_enabled?"MUTE":"UNMUTE");
         status_row(14,"  TOUCH + drag  SHAVE on top");
         status_row(15,"  CIRCLE PAD    MOVE CLIPPERS");
         status_row(16,"  HOLD A        SHAVE HAIR");
@@ -246,7 +246,7 @@ static void overlay_draw(void){
 static void scene_draw(void){
     C3D_Mtx view;
     Mtx_Identity(&view);
-    Mtx_Translate(&view,0.0f,-.06f,-3.8f,true);
+    Mtx_Translate(&view,0.0f,-.06f,-be_game_distance(&game),true);
     Mtx_RotateX(&view,game.pitch,true);
     Mtx_RotateY(&view,game.yaw,true);
     C3D_BindProgram(&program);
@@ -316,11 +316,12 @@ static bool process_input(void){
     if(down&KEY_START){
         be_game_title(&game);upload_mesh(true);return true;
     }
-    if(down&KEY_B)game.paused=!game.paused;
+    if(down&KEY_B){game.paused=!game.paused;game.previous_active=0;}
     if(game.paused){
         if(down&KEY_A){be_game_start(&game);upload_mesh(true);}
         return true;
     }
+    if(down&KEY_X){game.zoom=(game.zoom+1)%3;game.previous_active=0;}
     if(held&KEY_L)game.yaw-=.034f;
     if(held&KEY_R)game.yaw+=.034f;
     if(held&KEY_UP)game.pitch=clip(game.pitch+.027f,-.7f,.8f);
@@ -340,9 +341,14 @@ static bool process_input(void){
     }
     if((down&KEY_Y)&&be_game_locate(&game))upload_mesh(false);
     if(game.phase==BE_PLAY && ((held&KEY_A)||(held&KEY_TOUCH))){
-        if(be_game_shave(&game,game.cursor_x,game.cursor_y)>0)
+        float x0=game.previous_active?game.previous_x:game.cursor_x;
+        float y0=game.previous_active?game.previous_y:game.cursor_y;
+        if(be_game_shave_sweep(&game,x0,y0,game.cursor_x,game.cursor_y)>0)
             upload_mesh(false);
-    }
+        game.previous_x=game.cursor_x;
+        game.previous_y=game.cursor_y;
+        game.previous_active=1;
+    }else game.previous_active=0;
     be_game_tick(&game);
     return true;
 }
