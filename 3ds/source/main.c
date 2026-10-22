@@ -168,7 +168,7 @@ static void status_display(void){
     status_row(25,"  TOUCHSCREEN = CLIPPER PAD");
     status_row(26,"  PSP AND 3DS EDITIONS ARE SEPARATE");
     status_row(27,"");
-    status_row(28,sound_available?"  SAFE v1.2  |  DSP AUDIO":"  SAFE v1.2  |  SILENT MODE");
+    status_row(28,sound_available?"  FAST v1.3  |  DSP AUDIO":"  SAFE v1.2  |  SILENT MODE");
     status_present();
 }
 
@@ -261,13 +261,36 @@ static bool process_input(void){
         game.previous_y=game.cursor_y;
         game.previous_active=1;
     }else game.previous_active=0;
-    be_game_tick(&game);
     return true;
 }
 
+/* Advance the 90-second challenge in actual time, independent of redraw FPS.
+ * Tick accumulator is reset while paused or selecting an applicant. */
+static u64 tick_previous_ms=0;
+static u64 tick_remainder=0;
+static void tick_clock(void){
+    u64 now=osGetTime();
+    if(!tick_previous_ms){tick_previous_ms=now;return;}
+    u64 dt=now>=tick_previous_ms?now-tick_previous_ms:0;
+    tick_previous_ms=now;
+    if(game.phase!=BE_PLAY||game.paused){tick_remainder=0;return;}
+    if(dt>250)dt=250;
+    tick_remainder+=dt*BE_FPS;
+    for(int i=0;i<16 && tick_remainder>=1000;i++){
+        be_game_tick(&game);
+        tick_remainder-=1000;
+        if(game.phase!=BE_PLAY){tick_remainder=0;break;}
+    }
+}
+static void present_top(void){
+    u8 *fb=gfxGetFramebuffer(GFX_TOP,GFX_LEFT,NULL,NULL);
+    if(fb)GSPGPU_FlushDataCache(fb,400u*240u*3u);
+    gfxScreenSwapBuffers(GFX_TOP,false);
+}
 int main(void){
     gfxInitDefault();
     gfxSetDoubleBuffering(GFX_TOP,true);
+    gfxSetScreenFormat(GFX_TOP,GSP_BGR8_OES);
     /* consoleInit sets bottom RGB565 single-buffered and keeps its framebuffer. */
     consoleInit(GFX_BOTTOM,NULL);
     be_game_init(&game,&scene);
@@ -275,12 +298,12 @@ int main(void){
     status_invalidate();
     /* Draw a real top frame even before the first gameplay/input iteration. */
     be_soft_draw(&scene,&game);
-    gfxFlushBuffers();
-    gfxScreenSwapBuffers(GFX_TOP,false);
+    present_top();
     gspWaitForVBlank();
     sound_available=be_audio_init();
     while(aptMainLoop()){
         if(!process_input())break;
+        tick_clock();
         if(sound_available){
             if(last_audio_phase!=BE_WIN && game.phase==BE_WIN)be_audio_victory();
             u32 held=hidKeysHeld();
@@ -292,9 +315,7 @@ int main(void){
         last_audio_phase=game.phase;
         status_display();
         be_soft_draw(&scene,&game);
-        gfxFlushBuffers();
-        /* Swap TOP ONLY. Never swap the bottom console's backing buffer. */
-        gfxScreenSwapBuffers(GFX_TOP,false);
+        present_top();
         gspWaitForVBlank();
     }
     if(sound_available)be_audio_shutdown();
