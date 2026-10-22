@@ -63,6 +63,30 @@ int main(void){
     assert(game.phase==BE_PLAY);
     assert(be_game_time_seconds(&game)>90);
     assert(be_game_stars(&game)==3);
-    puts("PASS: 3DS arcade selection, live hair cuts, score, victory, timeout, Zen, last-hair assist and replay.");
+    /* Zoom must affect both the GPU camera distance and projected hit
+       coordinates. Sweeping across one projected tuft must clip it. */
+    be_game_select(&game,0);
+    be_game_start(&game);
+    assert(fabsf(be_game_distance(&game)-3.8f)<.001f);
+    int target=-1;
+    float sx=0,sy=0;
+    for(int i=0;i<mesh.hair_count;i++){
+        float x,y;
+        if(be_game_project(&game,&mesh.strands[i],&x,&y) &&
+           x>40.0f && x<360.0f && fabsf(x-200.0f)>20.0f){
+            target=i;sx=x;sy=y;break;
+        }
+    }
+    assert(target>=0);
+    game.zoom=1;
+    float zx=0,zy=0;
+    assert(be_game_distance(&game)<3.8f);
+    assert(be_game_project(&game,&mesh.strands[target],&zx,&zy));
+    assert(fabsf(zx-200.0f)>fabsf(sx-200.0f));
+    game.zoom=0;
+    assert(be_game_shave_sweep(&game,sx-38.0f,sy,sx+38.0f,sy)>0);
+    assert(mesh.strands[target].gone && mesh.removed>0);
+    assert(game.score>=20);
+    puts("PASS: 3DS arcade + sweep shaving + synchronized camera zoom.");
     return 0;
 }
