@@ -15,11 +15,19 @@ A GitHub Actions cross-compile passing is not a physical 3DS playtest.
 
 - Three applicants: **The Businessman**, **The Punk**, **The Professor**,
   with the PSP-inspired 3D facial silhouette and three distinct hair styles.
-- Native top-screen 3D rendering; interactive hair mesh with individual
-  strand removal; touch and Circle Pad clipping; continuous *swipe* hair
-  collision; head rotation and pitch; three camera zoom distances.
+- Native top-screen 3D rendering with a **higher-resolution 64×96 scalp mesh**
+  and colours sampled from the PSP's original procedural **256×256 facial
+  paint atlas** (eyes, irises, brows, lips, skin grain and stubble). This is
+  vertex-colour sampling, not yet full-resolution 3DS GPU texturing.
+- Every cut paints an individual clean-shave skin patch into a matching
+  coverage atlas, adding a light scalp polish as hair is removed.
+- Animated flying hair fragments, an electric clipper marker and visual
+  guidance for the last 12 hairs.
+- Touch and Circle Pad clipping with continuous *swipe* hair collision;
+  head rotation and pitch; three camera zoom distances.
 - **Challenge**: shave all hair within 90 seconds. **Zen**: untimed.
 - Score and combo, shave percentage/progress bar, a last-hair locator,
+  the PSP-inspired 30-second cleanup bonus and last-strand clock protection,
   timeout / retry, automatic victory orbit, medal stars and golden approval
   ceremony. The club rank is **Bald Boss**; the game's title is Bald Elite.
 - Optional NDSP music, clipper buzz, and success jingle. The 3DS music is a
@@ -102,8 +110,8 @@ The GitHub Actions workflow runs both tests and compiles the native
 
 ## Outstanding differences and validation
 
-- Restore the PSP's actual textured face, polish effect, skin atlas and
-  more detailed clipper/particle effects.
+- Upgrade the imported PSP face-atlas vertex colours to full GPU texture
+  sampling, tune the skin shader, and add detailed neck/shirt geometry.
 - Port the original sung **No Hair, No Fear!** soundtrack and the
   **“Another bald boss!”** neural announcer while respecting 3DS memory/DSP.
 - Replace text-console results with a graphical touch HUD, applicant outfits,
