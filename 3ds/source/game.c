@@ -141,8 +141,12 @@ int be_game_shave_sweep(BeGame *g,float x0,float y0,float x1,float y1){
         g->score+=hits*20+CLAMP(g->combo/3,0,60);
         g->last_cut=g->frames;
         g->last_hits=hits;
+#ifndef BE_SOFT_RENDER
+        /* Only the GPU build needs huge triangle arrays updated on each cut.
+         * The software build draws directly from strands and scalp coverage. */
         be_mesh_rebuild_hair(g->mesh);
         be_mesh_recolor_head(g->mesh);
+#endif
         if(g->mode==BE_CHALLENGE && !g->cleanup_bonus_given &&
            g->mesh->hair_count-g->mesh->removed<=10 &&
            g->mesh->hair_count-g->mesh->removed>0){
@@ -176,8 +180,10 @@ int be_game_locate(BeGame *g){
         }else{
             h->gone=1;g->mesh->removed++;g->score+=20;
             be_mesh_polish_hair(g->mesh,h);
+#ifndef BE_SOFT_RENDER
             be_mesh_rebuild_hair(g->mesh);
             be_mesh_recolor_head(g->mesh);
+#endif
             if(g->mesh->removed>=g->mesh->hair_count)finish_run(g);
         }
         return 1;
