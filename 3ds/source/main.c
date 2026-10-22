@@ -51,6 +51,14 @@ static void status_row(int line,const char *format,...){
     printf("\x1b[%d;1H%s",line,display);
 }
 static void status_display(void){
+    /* Redraw when the screen layout changes (including pause/resume), not
+       every frame: removes stale victory/pause rows without LCD flicker. */
+    static int previous_layout=-1;
+    int layout=game.phase+(game.phase==BE_PLAY && game.paused?10:0);
+    if(layout!=previous_layout){
+        for(int line=5;line<=23;line++)status_row(line,"");
+        previous_layout=layout;
+    }
     const char *name=be_candidate_names[game.candidate];
     status_row(1,"  =================================");
     status_row(2,"            BALD ELITE");
@@ -339,6 +347,9 @@ static bool process_input(void){
 }
 int main(void){
     gfxInitDefault();
+    /* Console draws only dirty lines. Single buffering prevents alternating
+       old/new bottom-screen framebuffers while Citro3D swaps the top. */
+    gfxSetDoubleBuffering(GFX_BOTTOM,false);
     consoleInit(GFX_BOTTOM,NULL);
     be_game_init(&game,&scene);
     if(!C3D_Init(C3D_DEFAULT_CMDBUF_SIZE)){
