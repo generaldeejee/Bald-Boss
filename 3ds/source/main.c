@@ -117,7 +117,8 @@ static void status_display(void){
         status_row(19,"  Y             FINAL HAIR HELP");
         status_row(20,"  B             PAUSE");
         status_row(21,"  START         LEVEL SELECT");
-        status_row(22,remaining<=8?"  Y ASSIST READY: %d LEFT": "  Keep shaving!",remaining);
+        status_row(22,remaining<=8?"  Y ASSIST READY: %d LEFT":
+                   (game.cleanup_bonus_given?"  +30 SEC CLEANUP BONUS!":"  Keep shaving!"),remaining);
     }else if(game.phase==BE_WIN){
         int stars=be_game_stars(&game);
         status_row(6,"  +------------------------------+");
@@ -157,13 +158,13 @@ static void status_display(void){
     fflush(stdout);
 }
 
-/* One-time VBO allocation, candidate swaps regenerate only their hair. */
+/* Upload current game-owned mesh. The game rules already regenerate on
+ * selection/start; NEVER re-generate here or the cut state disappears.
+ * Head colour data changes on every polished shave patch. */
 static void upload_mesh(bool generate){
-    if(generate)be_mesh_generate(&scene,game.candidate);
-    if(generate){
-        memcpy(head_vbo,scene.head,scene.head_count*sizeof(BeVertex));
-        GSPGPU_FlushDataCache(head_vbo,scene.head_count*sizeof(BeVertex));
-    }
+    (void)generate;
+    memcpy(head_vbo,scene.head,scene.head_count*sizeof(BeVertex));
+    GSPGPU_FlushDataCache(head_vbo,scene.head_count*sizeof(BeVertex));
     memcpy(hair_vbo,scene.hair,scene.hair_count*6*sizeof(BeVertex));
     GSPGPU_FlushDataCache(hair_vbo,scene.hair_count*6*sizeof(BeVertex));
 }
@@ -210,6 +211,39 @@ static void screen_rect(float x,float y,float w,float h,float r,float g,float b)
     screen_vertex(x+w,y,r,g,b);screen_vertex(x+w,y+h,r,g,b);screen_vertex(x,y+h,r,g,b);
     C3D_ImmDrawEnd();
 }
+/* Lightweight shaving fragments rendered on the top LCD. No sprites, texture
+ * allocations or external assets needed on the original Nintendo 3DS. */
+#define BE_PARTICLES 28
+typedef struct {float x,y,vx,vy;unsigned life;} BeParticle;
+static BeParticle shavings[BE_PARTICLES];
+static unsigned shaving_cursor=0,shaving_seed=0xB01D2026;
+static float shaving_rand(void){
+    shaving_seed=shaving_seed*1664525u+1013904223u;
+    return (float)((shaving_seed>>12)&4095u)/4095.0f;
+}
+static void shaving_emit(float x,float y,int hit){
+    int count=hit<4?hit*2:8;
+    for(int i=0;i<count;i++){
+        BeParticle *p=&shavings[shaving_cursor++%BE_PARTICLES];
+        p->x=x+(shaving_rand()-.5f)*22.0f;
+        p->y=y+(shaving_rand()-.5f)*13.0f;
+        p->vx=(shaving_rand()-.5f)*3.4f;
+        p->vy=-1.5f-shaving_rand()*2.2f;
+        p->life=21+(unsigned)(shaving_rand()*15.0f);
+    }
+}
+static void shaving_draw(void){
+    for(int i=0;i<BE_PARTICLES;i++){
+        BeParticle *p=&shavings[i];
+        if(!p->life)continue;
+        p->x+=p->vx;p->y+=p->vy;p->vy+=.14f;
+        p->life--;
+        if(p->x<2||p->x>398||p->y<3||p->y>231)continue;
+        float bright=p->life>12?.82f:(float)p->life/16.0f;
+        screen_rect(p->x,p->y,2.8f,1.9f,
+                    .62f*bright,.38f*bright,.20f*bright);
+    }
+}
 static void overlay_draw(void){
     C3D_Mtx identity;
     Mtx_Identity(&identity);
@@ -226,6 +260,23 @@ static void overlay_draw(void){
         screen_rect(x-14,y-1,28,2,.97f,.80f,.30f);
         screen_rect(x-1,y-14,2,28,.97f,.80f,.30f);
         screen_rect(x-3,y-3,6,6,.18f,.85f,.76f);
+        /* Distinctive two-tone electric barber clipper below the sight line. */
+        screen_rect(x-10,y+16,20,26,.18f,.25f,.30f);
+        screen_rect(x-8,y+18,16,20,.38f,.45f,.46f);
+        screen_rect(x-11,y+12,22,7,.73f,.76f,.75f);
+        screen_rect(x-12,y+11,24,2,.94f,.81f,.49f);
+        /* The PSP's final-hair guidance, now in 3DS projected coordinates. */
+        int remaining=scene.hair_count-scene.removed;
+        if(remaining>0 && remaining<=12){
+            for(int i=0;i<scene.hair_count;i++){
+                const BeHair *h=&scene.strands[i];
+                float hx,hy;
+                if(h->gone || !be_game_project(&game,h,&hx,&hy))continue;
+                screen_rect(hx-6,hy-5,12,1,.13f,.94f,.90f);
+                screen_rect(hx-6,hy+5,12,1,.13f,.94f,.90f);
+            }
+        }
+        shaving_draw();
         if(game.paused){
             screen_rect(90,85,220,7,.65f,.51f,.22f);
             screen_rect(90,155,220,7,.65f,.51f,.22f);
@@ -343,8 +394,11 @@ static bool process_input(void){
     if(game.phase==BE_PLAY && ((held&KEY_A)||(held&KEY_TOUCH))){
         float x0=game.previous_active?game.previous_x:game.cursor_x;
         float y0=game.previous_active?game.previous_y:game.cursor_y;
-        if(be_game_shave_sweep(&game,x0,y0,game.cursor_x,game.cursor_y)>0)
+        int cut=be_game_shave_sweep(&game,x0,y0,game.cursor_x,game.cursor_y);
+        if(cut>0){
+            shaving_emit(game.cursor_x,game.cursor_y,cut);
             upload_mesh(false);
+        }
         game.previous_x=game.cursor_x;
         game.previous_y=game.cursor_y;
         game.previous_active=1;
