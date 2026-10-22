@@ -25,13 +25,29 @@ jobs:
       image: devkitpro/devkitarm:20260610
     steps:
       - uses: actions/checkout@v4
-      - name: Confirm 3DS SDK and shader assembler
+      - name: Confirm Nintendo 3DS cross-toolchain
         run: |
+          set -eux
           test -n "${DEVKITARM}"
+          test -n "${DEVKITPRO}"
           test -f "${DEVKITARM}/3ds_rules"
+          arm-none-eabi-gcc --version
           command -v picasso
-      - name: Build first native Bald Elite 3DS homebrew
-        run: make -C 3ds -j2
+          command -v 3dsxtool
+          command -v smdhtool
+          test -f "${DEVKITPRO}/libctru/include/3ds.h"
+          test -f "${DEVKITPRO}/libctru/include/citro3d.h"
+      - name: Assemble PICA200 vertex shader (fail early on syntax)
+        run: |
+          set -eux
+          picasso -o /tmp/bald_elite_shader.shbin 3ds/source/vshader.v.pica
+          test -s /tmp/bald_elite_shader.shbin
+      - name: Build native Bald Elite 3DS homebrew
+        run: |
+          set -eux
+          make -C 3ds clean
+          make -C 3ds -j2
+          ls -lh 3ds/*.3dsx 3ds/*.smdh
       - name: Check 3DS Homebrew Launcher executable
         run: test -s 3ds/bald_elite_3ds.3dsx
       - uses: actions/upload-artifact@v4
