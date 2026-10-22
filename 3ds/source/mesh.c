@@ -225,6 +225,7 @@ void be_mesh_generate(BeMesh *m,int candidate){
     }else{
         memset(m->shaved_coverage,0,sizeof(m->shaved_coverage));
     }
+#ifndef BE_SOFT_RENDER
     if(new_head){
     for(int i=0;i<BE_RINGS;i++){
         float ya=1.14f-2.16f*i/BE_RINGS,yb=1.14f-2.16f*(i+1)/BE_RINGS;
@@ -252,6 +253,10 @@ void be_mesh_generate(BeMesh *m,int candidate){
         m->head[m->head_count++]=b;
     }
     }
+#else
+    /* CPU renderer samples the 256x256 skin atlas, not triangle arrays. */
+    m->head_count=BE_HEAD_VERTS;
+#endif
     seed=0xB01D2026u+0x9e3779b9u*(uint32_t)m->candidate;
     const int goal=m->candidate==0?900:(m->candidate==1?BE_MAX_HAIR:760);
     for(int tries=0;tries<BE_MAX_HAIR*70 && m->hair_count<goal;tries++){
@@ -276,6 +281,9 @@ void be_mesh_generate(BeMesh *m,int candidate){
                   (m->candidate==1?(.115f+.075f*rnd()):(.032f+.035f*rnd()));
         h->gone=0;
     }
+
+#ifndef BE_SOFT_RENDER
     be_mesh_rebuild_hair(m);
     be_mesh_recolor_head(m);
+#endif
 }
