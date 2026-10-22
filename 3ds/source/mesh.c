@@ -177,6 +177,7 @@ static void head_point(float y,float angle,float *x,float *outy,float *z){
     *x+=sx*.095f*ear;*z+=front*.012f*ear;
 }
 
+#ifndef BE_SOFT_RENDER
 static BeVertex head_vertex(float y,float a){
     BeVertex v;
     head_point(y,a,&v.x,&v.y,&v.z);
@@ -185,6 +186,8 @@ static BeVertex head_vertex(float y,float a){
     v.r=v.g=v.b=v.a=1.0f;
     return v;
 }
+
+#endif
 
 void be_mesh_rebuild_hair(BeMesh *m){
     int offset=0;
