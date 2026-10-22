@@ -119,13 +119,13 @@ int be_game_shave_sweep(BeGame *g,float x0,float y0,float x1,float y1){
     const float vx=(x1-x0)/16.0f,vy=(y1-y0)/14.0f;
     const float len2=vx*vx+vy*vy;
     int hits=0;
-    const float cy=cosf(g->yaw),sy=sinf(g->yaw);
+    const float cy=cosf(g->yaw),sinyaw=sinf(g->yaw);
     const float cp=cosf(g->pitch),sp=sinf(g->pitch);
     for(int i=0;i<g->mesh->hair_count;i++){
         BeHair *h=&g->mesh->strands[i];
         if(h->gone)continue;
         float sx,sy;
-        if(!project_fast(g,h,&sx,&sy,cy,sy,cp,sp))continue;
+        if(!project_fast(g,h,&sx,&sy,cy,sinyaw,cp,sp))continue;
         float dx=(sx-x0)/16.0f,dy=(sy-y0)/14.0f;
         float t=len2>1.0e-5f?CLAMP((dx*vx+dy*vy)/len2,0.0f,1.0f):0.0f;
         float ex=dx-t*vx,ey=dy-t*vy;
