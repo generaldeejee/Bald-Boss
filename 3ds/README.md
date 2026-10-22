@@ -1,79 +1,106 @@
-# Bald Elite — Nintendo 3DS port (milestone 1)
+# Bald Elite — Nintendo 3DS Arcade Edition (playable beta)
 
-This is **a real native 3DS homebrew prototype**, not an emulated PSP/PS1 build.
-It targets the **original 2011 Nintendo 3DS** using devkitARM, libctru,
-citro3d and the PICA200 graphics processor. It lives in a separate `3ds/`
-directory: **the existing PSP game and its Makefile are unchanged**.
+A **native Nintendo 3DS** port of the PSP homebrew Bald Elite, targeting the
+**original (old) Nintendo 3DS**. This edition builds separately to a `.3dsx`
+using devkitARM, libctru, citro3d and the PICA200 GPU. The PSP sources and PSP
+EBOOT build remain unchanged.
 
-## Implemented in source
+## What's playable in the source
 
-- **Top 3D screen:** a rotating 3D head with the *same mathematical face
-  profile* used by the PSP game's `src/bald_head_v2.h` (nose, brow, eyes,
-  lips and ears). The head uses temporary vertex colors rather than the PSP
-  texture atlas in this first milestone.
-- **Hair:** separate GPU geometry for the Businessman's neat cut, the Punk's
-  pink mohawk, and the Professor's thinning silver hair. All are generated
-  with the same deterministic distribution each time they are selected.
-- **Bottom screen:** text/status console with character name, controls and
-  the current milestone. No GPU GUI widgets yet.
-- **Buttons:** Left/Right changes applicant; L/R rotates the head;
-  Up/Down tilts it; X toggles automatic rotation; START quits to the
-  Homebrew Launcher.
-- **Build:** produces `3ds/bald_elite_3ds.3dsx` and
-  `3ds/bald_elite_3ds.smdh`; an independent GitHub Actions workflow
-  also runs host-side mesh tests.
+- **Three applicants:** The Businessman (short brown hair), The Punk (pink
+  mohawk), The Professor (thinning silver hair).
+- **Actual 3D shaving:** remove individual strands by dragging your finger or
+  stylus over the **bottom touchpad**; the clipper crosshair appears on the
+  **top** 3D screen. Use the **circle pad + hold A** as another control option.
+  Swift strokes sweep intervening hair rather than requiring a tap per strand.
+- **Rotate / tilt / zoom:** L/R rotates the head, Up/Down tilts it, X zooms
+  between three camera distances. Helps reach the scalp's far side.
+- **Two modes:** timed **90-second Challenge** and untimed **Zen**.
+- **Progress, score and combos:** displayed on the bottom screen; the top
+  screen also has a progress bar and a visible aiming cursor.
+- **Last-hair assist:** when 8 or fewer strands remain, tap Y to locate and
+  shave a difficult strand. This prevents an endless hunt for invisible hairs.
+- **Victory / failure:** stars, new Bald Boss membership ceremony, golden
+  on-screen accents, replay, next applicant, and level selection.
+- **Sound:** optional NDSP synthesised arcade instrumental loop, clipper buzz,
+  and victory fanfare. If DSP initialization fails, the game runs silently.
+- **High scores:** saves per applicant and per mode to the SD card at
+  `sdmc:/3ds/bald_elite_3ds/scores.txt`. If the SD is read-only, the game
+  still runs and remembers scores until exit.
+- **Anti-flicker interface:** unlike the earlier prototype, the bottom console
+  does **not** clear and repaint the entire screen every few frames; only
+  changed lines are updated, including during gameplay.
 
-## Not ported yet
+## Controls
 
-This is **not yet the complete Bald Elite game**. In particular,
-shaving collision detection/touchscreen interactions, score, timer,
-Zen/Challenge modes, victory membership cards, the PSP's original face texture,
-and audio/soundtrack **are not implemented on 3DS** at this milestone.
-The controls and preview demonstrate the rendering/input foundation, not a
-finished playable 3DS game.
+| When | Button | Action |
+| --- | --- | --- |
+| Level select | Left/Right | Choose applicant |
+| Level select | Up/Down | Choose Challenge / Zen |
+| Level select | A or X | Start |
+| Level select | Start | Exit the Homebrew Launcher application |
+| Playing | Touch and drag bottom screen | Move the clipper on the top screen and shave |
+| Playing | Circle pad | Move clipper |
+| Playing | Hold A | Shave at cursor |
+| Playing | L/R | Turn head |
+| Playing | Up/Down | Tilt head |
+| Playing | X | Cycle camera zoom |
+| Playing | Y, when 8 or fewer hairs remain | Final-hair assist |
+| Playing | B | Pause or resume |
+| Playing | Start | Return to level select |
+| Paused | A | Restart candidate |
+| Victory | A / X | Replay / Next candidate |
+| Failure | A / X | Retry |
+| Victory / Failure | B or Start | Return to selection |
+| Any screen | Select | Mute/unmute arcade music & buzz |
 
-## Building (devkitPro)
+The touch screen is a **clipper-control pad**, not a mirror of the 3D view. Its
+320x240 touch coordinates are mapped to the 400x240 top-screen crosshair.
 
-Install the official devkitPro **3ds-dev** toolchain (including devkitARM,
-libctru and citro3d) and `picasso`, then from the repo root:
+## Building
+
+Install devkitPro's `3ds-dev` packages, including devkitARM, libctru,
+citro3d, picasso and `3dsxtool`. Build from the repository root:
 
 ```sh
-make -C 3ds
+make -C 3ds clean
+make -C 3ds -j2
 ```
 
-For the standalone mesh test (without any Nintendo SDK):
+The result should be `3ds/bald_elite_3ds.3dsx`. Copy it to
+`sdmc:/3ds/bald_elite_3ds/bald_elite_3ds.3dsx` on a homebrew-capable 3DS,
+then launch it using Homebrew Launcher.
+
+GitHub Actions performs **separate host C geometry/gameplay regressions** and
+the full devkitARM 3DS cross-build. From a successful
+[Build Bald Elite Nintendo 3DS](https://github.com/generaldeejee/Bald-Boss/actions/workflows/build-3ds.yml)
+run, download the `BaldElite-3DS-Playable` artifact. A green workflow and
+in-game testing must still be checked before treating the version as released.
+
+Host regression tests (without the 3DS SDK):
 
 ```sh
 gcc -std=c99 -O2 -Wall -Wextra -Werror \
-  3ds/tests/test_mesh.c 3ds/source/mesh.c -lm -o /tmp/bald-elite-mesh-test
-/tmp/bald-elite-mesh-test
+  3ds/tests/test_mesh.c 3ds/source/mesh.c -lm -o /tmp/be-mesh
+/tmp/be-mesh
+gcc -std=c99 -O2 -Wall -Wextra -Werror \
+  3ds/tests/test_game.c 3ds/source/game.c 3ds/source/mesh.c \
+  -lm -o /tmp/be-game
+/tmp/be-game
 ```
 
-You can also download the `BaldElite-3DS-Prototype` artifact from a **green**
-[Build Bald Elite Nintendo 3DS Actions run](https://github.com/generaldeejee/Bald-Boss/actions).
-If the workflow fails there is **no verified binary** yet; read the failing log.
+## Remaining differences from the PSP version
 
-## Running
+This is now a **playable beta**, but not yet feature-identical to the PSP
+version. In particular, the original PSP **Piper vocal song and announcer**,
+the complete face texture atlas and shiny shaved-skin painting, and a highly
+polished graphical bottom-screen interface have not been ported. The 3DS audio
+is newly synthesised music, not a remix of the original PSP vocal recording.
 
-A standard SD-card Homebrew Launcher layout:
+The frame rate, dual-screen presentation, touch alignment, DSP availability,
+score saving and overall feel must be tested in the emulator or on physical
+**old 3DS hardware**. Source and CI checks alone do not guarantee that the
+finished game behaves perfectly on the console.
 
-```text
-sdmc:/3ds/bald_elite_3ds/bald_elite_3ds.3dsx
-```
-
-Copy the produced `.3dsx` onto the 3DS SD card. A prepared 3DS capable of
-launching homebrew is required; a Nintendo DS R4 flashcart is not the build
-target. Running this early prototype in a 3DS emulator or on a physical
-original 3DS is still necessary to establish frame rate and graphics quality.
-
-## Next engineering milestones
-
-1. Port the hair-hit projection and implement purposeful clipper movement
-   using the touch screen/circle pad.
-2. Reuse the PSP's original skin-texture painting and shaving coverage.
-3. Port score/time rules, Zen & Challenge, applicant progression, then music
-   and the golden club membership approval ceremony.
-4. Evaluate stereo 3D **only after** a stable, responsive original-3DS build.
-
-The head profile is an original part of the Bald Elite/PSP project.
-The shader/build conventions follow devkitPro's open 3ds-examples.
+The head profile is ported from the project's original PSP head geometry,
+and the basic GPU shader/render conventions follow devkitPro's 3DS examples.
