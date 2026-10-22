@@ -8,6 +8,7 @@
 #include <3ds.h>
 #include <math.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include "game.h"
 #include "mesh.h"
 #include "render_soft.h"
