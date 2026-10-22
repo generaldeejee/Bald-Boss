@@ -1,0 +1,149 @@
+/* Portable Bald Elite Nintendo 3DS arcade game rules.
+ * The projection mirrors the Citro3D view (50-degree vertical FOV,
+ * 400x240 top screen, translated camera 3.8 units from the head).
+ */
+#include "game.h"
+#include <math.h>
+#include <string.h>
+
+#define PI 3.14159265358979323846f
+#define CLAMP(x,a,b) ((x)<(a)?(a):((x)>(b)?(b):(x)))
+#define BE_FOCAL (120.0f/0.466307658f) /* tan(25 degrees) */
+
+void be_game_init(BeGame *g,BeMesh *mesh){
+    memset(g,0,sizeof(*g));
+    g->mesh=mesh;
+    g->cursor_x=200.0f;g->cursor_y=104.0f;
+    be_game_select(g,0);
+}
+
+void be_game_select(BeGame *g,int candidate){
+    if(candidate<0)candidate=(candidate%BE_CANDIDATES+BE_CANDIDATES)%BE_CANDIDATES;
+    g->candidate=candidate%BE_CANDIDATES;
+    be_mesh_generate(g->mesh,g->candidate);
+    g->phase=BE_TITLE;g->paused=0;
+    g->cursor_x=200;g->cursor_y=105;
+    g->yaw=0;g->pitch=0;
+    g->score=0;g->frames=0;g->combo=0;g->last_hits=0;
+}
+void be_game_start(BeGame *g){
+    be_mesh_generate(g->mesh,g->candidate);
+    g->phase=BE_PLAY;g->paused=0;g->score=0;g->frames=0;
+    g->combo=0;g->last_cut=-999;g->last_hits=0;g->celebration=0;
+    g->yaw=0;g->pitch=0;
+    g->cursor_x=200;g->cursor_y=105;
+}
+void be_game_title(BeGame *g){
+    g->phase=BE_TITLE;g->paused=0;
+    be_game_select(g,g->candidate);
+}
+void be_game_next(BeGame *g){
+    g->candidate=(g->candidate+1)%BE_CANDIDATES;
+    be_game_start(g);
+}
+int be_game_percentage(const BeGame *g){
+    return g->mesh->hair_count ? 100*g->mesh->removed/g->mesh->hair_count:0;
+}
+int be_game_time_seconds(const BeGame *g){
+    int seconds=g->frames/BE_FPS;
+    if(g->mode==BE_ZEN)return seconds;
+    return CLAMP(90-seconds,0,90);
+}
+int be_game_stars(const BeGame *g){
+    if(g->mode==BE_ZEN)return 3;
+    return g->frames<=50*BE_FPS?3:(g->frames<=75*BE_FPS?2:1);
+}
+static void finish_run(BeGame *g){
+    g->phase=BE_WIN;
+    g->paused=0;
+    g->celebration=0;
+    int *record=&g->best[g->candidate][g->mode];
+    if(g->score>*record)*record=g->score;
+    g->total_shaves++;
+}
+void be_game_tick(BeGame *g){
+    if(g->phase==BE_WIN){g->celebration++;return;}
+    if(g->phase!=BE_PLAY||g->paused)return;
+    g->frames++;
+    if(g->mode==BE_CHALLENGE&&g->frames>=BE_TIME_LIMIT&&
+       g->mesh->removed<g->mesh->hair_count){
+        g->phase=BE_FAIL;
+        g->paused=0;
+    }
+}
+
+/* Hair face visibility and screen coordinates (top screen, not bottom touch).
+ * A small threshold permits the crown to be shaved while rotating the head.
+ * The thick hair root is projected, not the tip, which is more stable. */
+int be_game_project(const BeGame *g,const BeHair *h,float *x,float *y){
+    float cy=cosf(g->yaw),sy=sinf(g->yaw);
+    float cp=cosf(g->pitch),sp=sinf(g->pitch);
+    float xx=cy*h->x+sy*h->z;
+    float zz=cy*h->z-sy*h->x;
+    float yy=cp*h->y-sp*zz;
+    float zr=sp*h->y+cp*zz;
+    float nx=cy*h->nx+sy*h->nz;
+    float nz=cy*h->nz-sy*h->nx;
+    float front=sp*h->ny+cp*nz;
+    if(front<-.03f || zr>=3.0f)return 0;
+    float inv=BE_FOCAL/(3.8f-zr);
+    *x=200.0f+xx*inv;
+    *y=120.0f-(yy-.06f)*inv;
+    if(*x<1||*x>399||*y<1||*y>239)return 0;
+    (void)nx;
+    return 1;
+}
+
+int be_game_shave(BeGame *g,float x,float y){
+    if(g->phase!=BE_PLAY||g->paused)return 0;
+    g->cursor_x=CLAMP(x,5.0f,395.0f);
+    g->cursor_y=CLAMP(y,4.0f,235.0f);
+    int hits=0;
+    for(int i=0;i<g->mesh->hair_count;i++){
+        BeHair *h=&g->mesh->strands[i];
+        if(h->gone)continue;
+        float sx,sy;
+        if(!be_game_project(g,h,&sx,&sy))continue;
+        float dx=(sx-g->cursor_x)/16.0f,dy=(sy-g->cursor_y)/14.0f;
+        if(dx*dx+dy*dy>1.0f)continue;
+        h->gone=1;
+        g->mesh->removed++;
+        hits++;
+    }
+    if(hits){
+        if(g->frames-g->last_cut>20)g->combo=0;
+        g->combo=CLAMP(g->combo+hits,0,100);
+        g->score+=hits*20+CLAMP(g->combo/3,0,60);
+        g->last_cut=g->frames;
+        g->last_hits=hits;
+        be_mesh_rebuild_hair(g->mesh);
+        if(g->mesh->removed>=g->mesh->hair_count)finish_run(g);
+    }
+    return hits;
+}
+
+/* Y assist: never force the player to search indefinitely for a few hairs.
+ * Orient the camera toward a remaining hair and center the clipper.
+ * Last remaining inaccessible hair can be removed directly, as in PSP.
+ */
+int be_game_locate(BeGame *g){
+    if(g->phase!=BE_PLAY||g->paused)return 0;
+    int remaining=g->mesh->hair_count-g->mesh->removed;
+    if(remaining>8)return 0;
+    for(int i=0;i<g->mesh->hair_count;i++){
+        BeHair *h=&g->mesh->strands[i];
+        if(h->gone)continue;
+        g->yaw=atan2f(h->nx,h->nz);
+        g->pitch=CLAMP(-atan2f(h->ny,sqrtf(h->nx*h->nx+h->nz*h->nz))*.7f,-.70f,.6f);
+        float sx,sy;
+        if(be_game_project(g,h,&sx,&sy)){
+            be_game_shave(g,sx,sy);
+        }else{
+            h->gone=1;g->mesh->removed++;g->score+=20;
+            be_mesh_rebuild_hair(g->mesh);
+            if(g->mesh->removed>=g->mesh->hair_count)finish_run(g);
+        }
+        return 1;
+    }
+    return 0;
+}
