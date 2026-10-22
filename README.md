@@ -24,12 +24,25 @@ The title screen now doubles as the **applicant and mode selector**. The Club Ba
 
 Built in C with the open-source PSPDEV/PSPSDK toolchain and PSP GU/GUM rendering. It is **not** a PS1 executable and needs **no PS1 BIOS**.
 
-## Experimental Nintendo 3DS port
+## Nintendo 3DS port — playable arcade beta
 
-A **separate native 3DS prototype** is now being developed under [`3ds/`](3ds/README.md), using devkitARM, libctru and citro3d. Its **first milestone** renders a Bald Elite 3D head and three selectable hairstyles on the 3DS top screen, with applicant information and controls on the bottom screen. It builds independently to a **`.3dsx`**, without affecting the PSP EBOOT.
+A separate [native Nintendo 3DS edition](3ds/README.md) now exists. Unlike
+the original preview that only rotated a head, this edition has **touchscreen
+and circle-pad hair shaving**, three candidates, **Challenge and Zen modes**,
+timed scoring and combos, golden club-membership victory, optional synthesized
+NDSP music/clipper effects, and **per-applicant high scores saved to SD**.
 
-The 3DS version is **not yet a complete game**: clipping, scoring, audio and the club victory ceremony remain PSP-only for now. The new [3DS build workflow](https://github.com/generaldeejee/Bald-Boss/actions/workflows/build-3ds.yml) will expose downloadable artifacts after successful toolchain compilation. **A full 3DS build and emulator/hardware test have not yet been independently verified.**
+The bottom-screen status renderer now changes only individual text rows,
+rather than clearing the full screen every 15 frames (which caused the
+reported flashing). The top 3D screen shows the clipper aiming crosshair
+and shaving-progress bar. Hold **A** with the circle pad or use the **touch
+screen** to shave; L/R turns the head, X zooms and Y helps find final hairs.
 
+The 3DS game builds to `bald_elite_3ds.3dsx`, and a green GitHub Actions run
+publishes `BaldElite-3DS-Playable`. **Compatibility on a real old 3DS
+still needs confirmation**. The 3DS audio is original, lightweight
+instrumental synth, not yet the PSP edition's recorded/Piper synthetic
+vocal track. The PSP build remains unchanged.
 
 ## What's new in v0.9.8
 
