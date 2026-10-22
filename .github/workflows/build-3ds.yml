@@ -23,6 +23,12 @@ jobs:
             3ds/tests/test_game.c 3ds/source/game.c 3ds/source/mesh.c \
             -lm -o /tmp/bald-elite-3ds-arcade-test
           /tmp/bald-elite-3ds-arcade-test
+      - name: Test performance-optimized software-renderer gameplay path
+        run: |
+          gcc -std=c99 -O2 -Wall -Wextra -Werror -DBE_SOFT_RENDER \
+            3ds/tests/test_game.c 3ds/source/game.c 3ds/source/mesh.c \
+            -lm -o /tmp/bald-elite-3ds-fast-test
+          /tmp/bald-elite-3ds-fast-test
 
   build-3ds:
     needs: mesh-test
