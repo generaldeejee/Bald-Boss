@@ -1,13 +1,13 @@
 ; Bald Elite for Nintendo 3DS - position + per-vertex color.
-; Based on the interface used by devkitPro's citro3d examples.
+; Matches official devkitPro PICASSO vshader input declarations and matrices.
 
 .fvec projection[4], modelView[4]
 .constf one(0.0, 1.0, 0.0, 0.0)
 .alias ones one.yyyy
 .out outpos position
 .out outclr color
-.alias inpos v0
-.alias inclr v1
+.in inpos v0
+.in inclr v1
 
 .proc main
     mov r0.xyz, inpos
