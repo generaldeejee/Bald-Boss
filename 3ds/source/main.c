@@ -39,6 +39,13 @@ static int last_audio_phase=BE_TITLE;
 #define STATUS_ROWS 29
 #define STATUS_COLS 38
 static char old_row[STATUS_ROWS+1][STATUS_COLS+1];
+/* Coalesce console changes to ten refreshes/sec instead of doing formatted
+   text output on every GPU frame. Phase/selection switches remain instant. */
+static int status_epoch=0;
+static void status_invalidate(void){
+    memset(old_row,0,sizeof(old_row));
+    status_epoch++;
+}
 static void status_row(int line,const char *format,...){
     if(line<1||line>STATUS_ROWS)return;
     char tmp[160],display[STATUS_COLS+1];
@@ -52,17 +59,21 @@ static void status_row(int line,const char *format,...){
     printf("\x1b[%d;1H%s",line,display);
 }
 static void status_display(void){
-    /* Redraw when the screen layout changes (including pause/resume), not
-       every frame: removes stale victory/pause rows without LCD flicker. */
-    static int previous_layout=-1;
+    /* Update console text at 10 Hz, and immediately on a mode/phase change.
+       Crucially we NEVER clear the whole bottom LCD while playing. */
+    static int previous_layout=-1,previous_candidate=-1,previous_epoch=-1;
     int layout=game.phase+(game.phase==BE_PLAY && game.paused?10:0);
-    if(layout!=previous_layout){
+    if(layout==previous_layout && previous_candidate==game.candidate &&
+       previous_epoch==status_epoch && game.frames%6!=0)return;
+    if(layout!=previous_layout || previous_epoch!=status_epoch){
         for(int line=5;line<=23;line++)status_row(line,"");
         previous_layout=layout;
     }
+    previous_candidate=game.candidate;
+    previous_epoch=status_epoch;
     const char *name=be_candidate_names[game.candidate];
     status_row(1,"  =================================");
-    status_row(2,"            BALD ELITE");
+    status_row(2,"       BALD ELITE 3DS ARCADE");
     status_row(3,"  ===== THE ELITE BALD CLUB =======");
     status_row(4,"");
     if(game.phase==BE_TITLE){
@@ -154,7 +165,7 @@ static void status_display(void){
     status_row(25,"  TOUCHSCREEN = CLIPPER PAD");
     status_row(26,"  PSP AND 3DS EDITIONS ARE SEPARATE");
     status_row(27,"");
-    status_row(28,sound_available?"  Bald Elite 3DS  |  DSP audio":"  Bald Elite 3DS  |  silent mode");
+    status_row(28,sound_available?"  ARCADE BUILD  |  DSP AUDIO":"  ARCADE BUILD  |  SILENT MODE");
     fflush(stdout);
 }
 
@@ -330,7 +341,7 @@ static float clip(float x,float low,float high){
 static bool process_input(void){
     hidScanInput();
     u32 down=hidKeysDown(),held=hidKeysHeld();
-    if(down&KEY_SELECT)sound_enabled=!sound_enabled;
+    if(down&KEY_SELECT){sound_enabled=!sound_enabled;status_invalidate();}
     if(game.phase==BE_TITLE){
         if(down&KEY_START)return false;
         if(down&KEY_LEFT){
@@ -341,8 +352,8 @@ static bool process_input(void){
             be_game_select(&game,game.candidate+1);
             upload_mesh(true);
         }
-        if(down&KEY_UP)game.mode=BE_CHALLENGE;
-        if(down&KEY_DOWN)game.mode=BE_ZEN;
+        if(down&KEY_UP){game.mode=BE_CHALLENGE;status_invalidate();}
+        if(down&KEY_DOWN){game.mode=BE_ZEN;status_invalidate();}
         if(down&(KEY_A|KEY_X)){
             be_game_start(&game);
             upload_mesh(true);
@@ -372,7 +383,7 @@ static bool process_input(void){
         if(down&KEY_A){be_game_start(&game);upload_mesh(true);}
         return true;
     }
-    if(down&KEY_X){game.zoom=(game.zoom+1)%3;game.previous_active=0;}
+    if(down&KEY_X){game.zoom=(game.zoom+1)%3;game.previous_active=0;status_invalidate();}
     if(held&KEY_L)game.yaw-=.034f;
     if(held&KEY_R)game.yaw+=.034f;
     if(held&KEY_UP)game.pitch=clip(game.pitch+.027f,-.7f,.8f);
@@ -412,6 +423,7 @@ int main(void){
        old/new bottom-screen framebuffers while Citro3D swaps the top. */
     gfxSetDoubleBuffering(GFX_BOTTOM,false);
     consoleInit(GFX_BOTTOM,NULL);
+    status_invalidate();
     be_game_init(&game,&scene);
     be_save_load(&game);
     if(!C3D_Init(C3D_DEFAULT_CMDBUF_SIZE)){
