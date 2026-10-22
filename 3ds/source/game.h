@@ -15,7 +15,7 @@ typedef struct {
     int frames, score, combo, best[BE_CANDIDATES][2];
     int last_cut, last_hits, celebration, total_shaves;
     float yaw,pitch,cursor_x,cursor_y;
-    int zoom, previous_active;
+    int zoom, previous_active, cleanup_bonus_given;
     float previous_x,previous_y;
 } BeGame;
 
