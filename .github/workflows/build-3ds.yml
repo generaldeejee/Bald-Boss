@@ -29,6 +29,9 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: devkitpro/devkitarm:20260610
+    # The upstream container does not put devkitARM/bin on PATH.
+    env:
+      PATH: /opt/devkitpro/devkitARM/bin:/opt/devkitpro/tools/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
     steps:
       - uses: actions/checkout@v4
       - name: Confirm Nintendo 3DS cross-toolchain
