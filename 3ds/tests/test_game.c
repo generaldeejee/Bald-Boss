@@ -94,6 +94,7 @@ int main(void){
     assert(polished>0);
     /* Original PSP's last-hair protection: a single inaccessible strand
        must not fail the timed challenge during cleanup. */
+    game.mode=BE_CHALLENGE;
     be_game_start(&game);
     for(int i=1;i<mesh.hair_count;i++)mesh.strands[i].gone=1;
     mesh.removed=mesh.hair_count-1;
