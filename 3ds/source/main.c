@@ -11,6 +11,7 @@
 
 #include "mesh.h"
 #include "game.h"
+#include "audio.h"
 #include "vshader_shbin.h"
 
 #define BG_COLOR 0x142537FF
@@ -143,7 +144,7 @@ static void status_display(void){
     status_row(25,"  TOUCHSCREEN = CLIPPER PAD");
     status_row(26,"  PSP AND 3DS EDITIONS ARE SEPARATE");
     status_row(27,"");
-    status_row(28,"  Bald Elite 3DS - playable beta");
+    status_row(28,sound_available?"  Bald Elite 3DS  |  DSP audio":"  Bald Elite 3DS  |  silent mode");
     fflush(stdout);
 }
 
@@ -269,6 +270,7 @@ static float clip(float x,float low,float high){
 static bool process_input(void){
     hidScanInput();
     u32 down=hidKeysDown(),held=hidKeysHeld();
+    if(down&KEY_SELECT)sound_enabled=!sound_enabled;
     if(game.phase==BE_TITLE){
         if(down&KEY_START)return false;
         if(down&KEY_LEFT){
@@ -354,8 +356,17 @@ int main(void){
         printf("Failed to initialize Bald Elite 3DS.\n");
         scene_shutdown();C3D_Fini();gfxExit();return 1;
     }
+    sound_available=be_audio_init();
     while(aptMainLoop()){
         if(!process_input())break;
+        if(sound_available){
+            if(last_audio_phase!=BE_WIN && game.phase==BE_WIN)be_audio_victory();
+            u32 held=hidKeysHeld();
+            bool shaving=game.phase==BE_PLAY && !game.paused &&
+                         ((held&KEY_A)||(held&KEY_TOUCH));
+            be_audio_update(sound_enabled,shaving);
+        }
+        last_audio_phase=game.phase;
         status_display();
         C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
         C3D_RenderTargetClear(target,C3D_CLEAR_ALL,BG_COLOR,0);
@@ -363,6 +374,7 @@ int main(void){
         scene_draw();
         C3D_FrameEnd(0);
     }
+    if(sound_available)be_audio_shutdown();
     scene_shutdown();
     C3D_Fini();
     gfxExit();
