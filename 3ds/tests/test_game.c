@@ -87,6 +87,19 @@ int main(void){
     assert(be_game_shave_sweep(&game,sx-38.0f,sy,sx+38.0f,sy)>0);
     assert(mesh.strands[target].gone && mesh.removed>0);
     assert(game.score>=20);
+    /* Hair removal must also mark atlas polish; the scalp is no longer
+       merely hair-free geometry. */
+    int polished=0;
+    for(int i=0;i<256*256;i++)if(mesh.shaved_coverage[i])polished++;
+    assert(polished>0);
+    /* Original PSP's last-hair protection: a single inaccessible strand
+       must not fail the timed challenge during cleanup. */
+    be_game_start(&game);
+    for(int i=1;i<mesh.hair_count;i++)mesh.strands[i].gone=1;
+    mesh.removed=mesh.hair_count-1;
+    game.frames=BE_TIME_LIMIT-1;
+    for(int i=0;i<3*BE_FPS;i++)be_game_tick(&game);
+    assert(game.phase==BE_PLAY && game.frames==BE_TIME_LIMIT-1);
     puts("PASS: 3DS arcade + sweep shaving + synchronized camera zoom.");
     return 0;
 }
