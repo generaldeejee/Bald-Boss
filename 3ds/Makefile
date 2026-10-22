@@ -14,7 +14,7 @@ DATA :=
 INCLUDES := source
 
 APP_TITLE := Bald Elite
-APP_DESCRIPTION := Nintendo 3DS homebrew port (early 3D prototype)
+APP_DESCRIPTION := Native 3DS playable barber arcade beta
 APP_AUTHOR := generaldeejee
 ARCH := -march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft
 CFLAGS := -g -Wall -Wextra -O2 -mword-relocations -ffunction-sections $(ARCH)
