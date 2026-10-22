@@ -178,7 +178,7 @@ static BeVertex head_vertex(float y,float a){
     BeVertex v;
     head_point(y,a,&v.x,&v.y,&v.z);
     v.u=(a/(2.0f*PI))+.5f;
-    v.v=(1.14f-y)/2.16f;
+    v.v=clampf((1.14f-y)/2.16f,0.0f,1.0f);
     v.r=v.g=v.b=v.a=1.0f;
     return v;
 }
