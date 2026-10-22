@@ -17,6 +17,12 @@ jobs:
           gcc -std=c99 -O2 -Wall -Wextra -Werror \
             3ds/tests/test_mesh.c 3ds/source/mesh.c -lm -o /tmp/bald-elite-3ds-mesh-test
           /tmp/bald-elite-3ds-mesh-test
+      - name: Compile and test full 3DS arcade game rules on host
+        run: |
+          gcc -std=c99 -O2 -Wall -Wextra -Werror \
+            3ds/tests/test_game.c 3ds/source/game.c 3ds/source/mesh.c \
+            -lm -o /tmp/bald-elite-3ds-arcade-test
+          /tmp/bald-elite-3ds-arcade-test
 
   build-3ds:
     needs: mesh-test
@@ -52,7 +58,7 @@ jobs:
         run: test -s 3ds/bald_elite_3ds.3dsx
       - uses: actions/upload-artifact@v4
         with:
-          name: BaldElite-3DS-Prototype
+          name: BaldElite-3DS-Playable
           path: |
             3ds/bald_elite_3ds.3dsx
             3ds/bald_elite_3ds.smdh
