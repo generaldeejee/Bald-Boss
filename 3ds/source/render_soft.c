@@ -9,6 +9,7 @@
 #include <math.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 #include "game.h"
 #include "mesh.h"
 #include "render_soft.h"
@@ -48,100 +49,170 @@ static void line(u8 *fb,int x0,int y0,int x1,int y1,int r,int g,int b,int width)
         if(width>1){pixel(fb,x+1,y,r,g,b);pixel(fb,x,y+1,r,g,b);}
     }
 }
+/* Pre-rendered mirror and barbershop backdrop, only when scenery changes. */
 static void backdrop(u8 *fb,const BeGame *g){
-    for(int x=0;x<SW;x++)for(int y=0;y<SH;y++){
-        int glow=(int)(34.0f*(1.0f-fabsf((float)(x-200)/220.0f)));
-        glow=CLAMP(glow,0,36);
-        int grain=((x*13+y*7)&7);
-        pixel(fb,x,y,13+glow/5+grain/4,26+glow/3,40+glow/2);
+    for(int x=0;x<SW;x++){
+        int glow=CLAMP(24-abs(x-200)/11,0,24);
+        for(int y=0;y<SH;y++){
+            int grain=((x*13+y*7)&7);
+            pixel(fb,x,y,12+glow/7+grain/4,25+glow/3,38+glow/2);
+        }
     }
-    /* Barber-shop mirror, gold trim, side columns, tiled counter. */
-    rect(fb,18,18,364,207,43,61,75);
-    rect(fb,23,23,354,196,8,20,31);
-    rect(fb,27,27,346,188,18,34,46);
-    rect(fb,27,27,346,3,151,116,54);
-    rect(fb,27,212,346,3,151,116,54);
-    rect(fb,23,26,3,190,145,111,47);
-    rect(fb,373,26,3,190,145,111,47);
-    for(int x=40;x<=360;x+=40)rect(fb,x,230,2,10,51,65,70);
-    rect(fb,0,228,400,12,24,38,45);
-    /* Proper title-phase still paints both LCDs, even with no input. */
-    if(g->phase==BE_TITLE)rect(fb,27,27,346,4,203,159,76);
+    rect(fb,11,10,378,218,35,43,49);
+    rect(fb,15,14,370,211,134,101,48);
+    rect(fb,19,18,362,203,72,52,34);
+    rect(fb,25,24,350,191,15,29,40);
+    for(int x=28;x<373;x++){
+        int glow=CLAMP(18-abs(x-147)/12,0,18);
+        rect(fb,x,29,1,182,18+glow/3,38+glow/2,52+glow);
+    }
+    rect(fb,31,32,3,172,96,124,137);
+    rect(fb,365,30,3,180,45,73,89);
+    rect(fb,25,24,350,3,213,175,90);
+    rect(fb,25,212,350,3,196,152,70);
+    rect(fb,15,15,370,2,230,193,110);
+    /* Small salon lights and a dark countertop with a gold edge. */
+    for(int x=53;x<=347;x+=49){
+        rect(fb,x,17,16,2,237,221,158);
+        rect(fb,x+3,19,10,3,140,158,159);
+    }
+    rect(fb,0,226,400,14,25,37,44);
+    rect(fb,0,226,400,2,170,131,59);
+    if(g->phase==BE_TITLE)rect(fb,29,30,342,2,215,172,79);
 }
-static void head_draw(u8 *fb,const BeMesh *m,const BeGame *g){
-    const float sy=sinf(g->yaw),cy=cosf(g->yaw);
-    const float sp=sinf(g->pitch),cp=cosf(g->pitch);
-    const float distance=be_game_distance(g);
-    const float xrad2=1.0f/(.645f*.645f);
-    const float yrad2=1.0f/(1.13f*1.13f);
-    const float zrad2=1.0f/(.66f*.66f);
-    /* Transform the view ray into local head coordinates. */
+
+/* Head geometry UV and lighting are expensive on the old 3DS: compute
+ * them ONLY when the camera changes. During shaving we reuse the map and
+ * resample the changing scalp coverage instead of running 30,000 atan2f
+ * calls or rebuilding 37,000 triangles. Full-resolution 1px rendering. */
+static u8 scene_cache[SW*SH*3];
+static u16 head_uv[SW*SH];
+static u8 head_light[SW*SH];
+static bool lookup_valid=false,scene_valid=false;
+static float last_yaw=0.0f,last_pitch=0.0f;
+static int last_zoom=-1,last_removed=-1,last_candidate=-1,last_phase=-1,last_mode=-1;
+static unsigned move_frames=0;
+
+static float fast_angle(float y,float x){
+    /* Max error <~0.01 radians; far cheaper than libm atan2f on ARM11. */
+    const float ay=fabsf(y)+0.0000001f;
+    float r,angle;
+    if(x<0.0f){
+        r=(x+ay)/(ay-x);
+        angle=2.35619449f;
+    }else{
+        r=(x-ay)/(x+ay);
+        angle=.78539816f;
+    }
+    angle+=(.1963f*r*r-.9817f)*r;
+    return y<0.0f?-angle:angle;
+}
+static void rebuild_head_lookup(const BeGame *g){
+    float sn=sinf(g->yaw),cs=cosf(g->yaw);
+    float sp=sinf(g->pitch),cp=cosf(g->pitch);
+    float distance=be_game_distance(g);
+    const float irx=1.0f/(.645f*.645f);
+    const float iry=1.0f/(1.13f*1.13f);
+    const float irz=1.0f/(.66f*.66f);
     float oy=cp*.06f+sp*distance;
     float oz0=-sp*.06f+cp*distance;
-    float ox=-sy*oz0,oz=cy*oz0+.04f;
-    float cc=ox*ox*xrad2+oy*oy*yrad2+oz*oz*zrad2-1.0f;
-    for(int x=36;x<364;x+=2){
+    float ox=-sn*oz0,oz=cs*oz0+.04f;
+    float cc=ox*ox*irx+oy*oy*iry+oz*oz*irz-1.0f;
+    for(int x=35;x<365;x++){
         float vx=((float)x+.5f-200.0f)/FOCAL;
-        for(int y=12;y<226;y+=2){
-            float vy=(120.0f-((float)y+.5f))/FOCAL;
-            float py=cp*vy-sp;
-            float pz=-sp*vy-cp;
-            float dx=cy*vx-sy*pz;
-            float dz=sy*vx+cy*pz;
-            float aa=dx*dx*xrad2+py*py*yrad2+dz*dz*zrad2;
-            float bb=2.0f*(ox*dx*xrad2+oy*py*yrad2+oz*dz*zrad2);
-            float discriminant=bb*bb-4.0f*aa*cc;
-            if(discriminant<=0.0f)continue;
-            float t=(-bb-sqrtf(discriminant))/(2.0f*aa);
+        for(int y=10;y<227;y++){
+            int index=x*SH+y;
+            head_uv[index]=0xffff;
+            float vy=(120.0f-(float)y-.5f)/FOCAL;
+            float py=cp*vy-sp,pz=-sp*vy-cp;
+            float dx=cs*vx-sn*pz,dz=sn*vx+cs*pz;
+            float aa=dx*dx*irx+py*py*iry+dz*dz*irz;
+            float bb=2.0f*(ox*dx*irx+oy*py*iry+oz*dz*irz);
+            float disc=bb*bb-4.0f*aa*cc;
+            if(disc<=0.0f)continue;
+            float t=(-bb-sqrtf(disc))/(2.0f*aa);
             if(t<=0.0f)continue;
             float hx=ox+dx*t,hy=oy+py*t,hz=oz+dz*t;
-            float u=.5f+atan2f(hx,hz-.04f)/(2.0f*PI);
+            float u=.5f+fast_angle(hx,hz-.04f)/(2.0f*PI);
             float v=(1.14f-hy)/2.16f;
-            int tx=CLAMP((int)(u*255.0f),0,255);
-            int ty=CLAMP((int)(v*255.0f),0,255);
-            int idx=ty*256+tx;
-            unsigned short c=m->skin_base[idx];
-            float pol=(float)m->shaved_coverage[idx]/255.0f;
-            float light=.82f+.08f*hy+.05f*(hz/.66f);
-            light=CLAMP(light,.58f,1.0f);
-            int r=(int)(((c&31)*255.0f/31.0f)*(1.0f-.10f*pol)*light+pol*34.0f);
-            int green=(int)((((c>>5)&63)*255.0f/63.0f)*(1.0f-.09f*pol)*light+pol*24.0f);
-            int b=(int)((((c>>11)&31)*255.0f/31.0f)*(1.0f-.07f*pol)*light+pol*20.0f);
-            r=CLAMP(r,0,255);green=CLAMP(green,0,255);b=CLAMP(b,0,255);
-            pixel(fb,x,y,r,green,b);pixel(fb,x+1,y,r,green,b);
-            pixel(fb,x,y+1,r,green,b);pixel(fb,x+1,y+1,r,green,b);
+            int tx=CLAMP((int)(u*255.0f+.5f),0,255);
+            int ty=CLAMP((int)(v*255.0f+.5f),0,255);
+            head_uv[index]=(u16)(ty*256+tx);
+            /* Soft key light + sculpted nose bridge, cheeks and crown. */
+            float luminance=.70f+.15f*(hz+.66f)/1.32f+.06f*hy;
+            float bridge=CLAMP((.12f-fabsf(hx))/.12f,0.0f,1.0f);
+            float bridge_y=CLAMP((.48f-fabsf(hy+.08f))/.48f,0.0f,1.0f);
+            if(hz>.24f)luminance+=.13f*bridge*bridge_y;
+            if(hx<-.2f)luminance+=.035f;
+            head_light[index]=(u8)CLAMP((int)(luminance*255),95,255);
+        }
+    }
+    lookup_valid=true;
+    last_yaw=g->yaw;last_pitch=g->pitch;last_zoom=g->zoom;
+}
+static void head_draw(u8 *fb,const BeMesh *m){
+    for(int x=35;x<365;x++){
+        for(int y=10;y<227;y++){
+            int i=x*SH+y;
+            u16 idx=head_uv[i];
+            if(idx==0xffff)continue;
+            u16 color=m->skin_base[idx];
+            int l=head_light[i];
+            int r=((color&31)*255/31)*l/255;
+            int green=(((color>>5)&63)*255/63)*l/255;
+            int b=(((color>>11)&31)*255/31)*l/255;
+            int shine=m->shaved_coverage[idx];
+            r=CLAMP(r+shine/6,0,255);
+            green=CLAMP(green+shine/8,0,255);
+            b=CLAMP(b+shine/11,0,255);
+            u8 *p=fb+3*(x*SH+SH-1-y);
+            p[0]=(u8)b;p[1]=(u8)green;p[2]=(u8)r;
         }
     }
 }
-static int project_point(const BeGame *g,float x,float y,float z,float *sx,float *sy){
-    const float cy=cosf(g->yaw),sn=sinf(g->yaw);
-    const float cp=cosf(g->pitch),sp=sinf(g->pitch);
-    float xx=cy*x+sn*z,zz=cy*z-sn*x;
-    float yy=cp*y-sp*zz,zr=sp*y+cp*zz;
-    float depth=be_game_distance(g)-zr;
-    if(depth<.5f)return 0;
-    float f=FOCAL/depth;
-    *sx=200.0f+xx*f;*sy=120.0f-(yy-.06f)*f;
-    return 1;
-}
+
+
 static void hair_draw(u8 *fb,const BeMesh *m,const BeGame *g){
-    const int colors[3][3]={{61,37,27},{224,58,116},{204,194,180}};
-    int candidate=CLAMP(m->candidate,0,2);
+    static const int rgb[3][3]={{72,45,29},{232,62,127},{202,193,169}};
+    const int candidate=CLAMP(m->candidate,0,2);
+    const float cs=cosf(g->yaw),sn=sinf(g->yaw);
+    const float cp=cosf(g->pitch),sp=sinf(g->pitch);
+    const float distance=be_game_distance(g);
     for(int i=0;i<m->hair_count;i++){
         const BeHair *h=&m->strands[i];
         if(h->gone)continue;
-        float sx,sy,ex,ey;
-        if(!be_game_project(g,h,&sx,&sy))continue;
-        float length=h->length;
-        if(!project_point(g,h->x+h->nx*length*.55f,
-                          h->y+length*.7f,h->z+h->nz*length*.55f,&ex,&ey))continue;
-        int shade=(i*31)&15;
-        line(fb,(int)sx,(int)sy,(int)ex,(int)ey,
-             CLAMP(colors[candidate][0]-shade,0,255),
-             CLAMP(colors[candidate][1]-shade,0,255),
-             CLAMP(colors[candidate][2]-shade,0,255),candidate==1?2:1);
+        float facing=sp*h->ny+cp*(cs*h->nz-sn*h->nx);
+        if(facing<-.03f)continue;
+        float xx=cs*h->x+sn*h->z;
+        float zz=cs*h->z-sn*h->x;
+        float yy=cp*h->y-sp*zz;
+        float zr=sp*h->y+cp*zz;
+        float depth=distance-zr;
+        if(depth<.8f)continue;
+        float scale=FOCAL/depth;
+        float sx=200.0f+xx*scale;
+        float sy=120.0f-(yy-.06f)*scale;
+        if(sx<0||sx>=400||sy<0||sy>=240)continue;
+        float tip=h->length;
+        float tipx=h->x+h->nx*tip*.55f;
+        float tipy=h->y+tip*.7f;
+        float tipz=h->z+h->nz*tip*.55f;
+        float tx=cs*tipx+sn*tipz;
+        float tz=cs*tipz-sn*tipx;
+        float ty=cp*tipy-sp*tz;
+        float td=distance-(sp*tipy+cp*tz);
+        if(td<.7f)continue;
+        float ts=FOCAL/td;
+        int brightness=(i*17)&17;
+        line(fb,(int)sx,(int)sy,(int)(200.0f+tx*ts),
+             (int)(120.0f-(ty-.06f)*ts),
+             rgb[candidate][0]-brightness,
+             rgb[candidate][1]-brightness,
+             rgb[candidate][2]-brightness,
+             candidate==1?2:1);
     }
 }
+
 void be_soft_emit(float x,float y,int hits){
     int count=CLAMP(hits,0,8);
     for(int i=0;i<count;i++){
@@ -183,8 +254,33 @@ static void hud_draw(u8 *fb,const BeGame *g){
 void be_soft_draw(const BeMesh *mesh,const BeGame *game){
     u8 *fb=gfxGetFramebuffer(GFX_TOP,GFX_LEFT,NULL,NULL);
     if(!fb)return;
-    backdrop(fb,game);
-    head_draw(fb,mesh,game);
-    hair_draw(fb,mesh,game);
+    const bool new_level=(last_candidate!=game->candidate||
+                          last_zoom!=game->zoom);
+    const bool camera_moved=(game->yaw!=last_yaw||game->pitch!=last_pitch);
+    bool recalc=!lookup_valid||new_level;
+    /* Reproject moving camera at ~30Hz; input, cursor and clipping still
+       run at full frame rate. Never stall every shave stroke on ray tracing. */
+    if(!recalc && camera_moved){
+        if(++move_frames>=2){recalc=true;move_frames=0;}
+    }else if(!camera_moved)move_frames=0;
+    if(recalc){
+        rebuild_head_lookup(game);
+        scene_valid=false;
+    }
+    if(!scene_valid||last_removed!=mesh->removed||
+       last_candidate!=game->candidate||last_phase!=game->phase||
+       last_mode!=game->mode){
+        backdrop(scene_cache,game);
+        head_draw(scene_cache,mesh);
+        hair_draw(scene_cache,mesh,game);
+        last_removed=mesh->removed;
+        last_candidate=game->candidate;
+        last_phase=game->phase;
+        last_mode=game->mode;
+        scene_valid=true;
+    }
+    /* Copy the cached non-interactive scene; only cursor/progress/particles
+       are composited fresh. Makes A-held shaving cheap even on old 3DS. */
+    memcpy(fb,scene_cache,sizeof(scene_cache));
     hud_draw(fb,game);
 }
