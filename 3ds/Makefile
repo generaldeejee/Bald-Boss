@@ -14,11 +14,11 @@ DATA :=
 INCLUDES := source
 
 APP_TITLE := Bald Elite
-APP_DESCRIPTION := Bald Elite 3DS v1.2 safe CPU renderer
+APP_DESCRIPTION := Bald Elite v1.3 high detail fast software
 APP_AUTHOR := generaldeejee
 ARCH := -march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft
 CFLAGS := -g -Wall -Wextra -O2 -mword-relocations -ffunction-sections $(ARCH)
-CFLAGS += $(INCLUDE) -D__3DS__ -std=gnu99
+CFLAGS += $(INCLUDE) -D__3DS__ -DBE_SOFT_RENDER -std=gnu99
 CXXFLAGS := $(CFLAGS) -fno-rtti -fno-exceptions
 ASFLAGS := -g $(ARCH)
 LDFLAGS = -specs=3dsx.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
