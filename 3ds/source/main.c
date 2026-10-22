@@ -12,6 +12,7 @@
 #include "mesh.h"
 #include "game.h"
 #include "audio.h"
+#include "save.h"
 #include "vshader_shbin.h"
 
 #define BG_COLOR 0x142537FF
@@ -352,6 +353,7 @@ int main(void){
     gfxSetDoubleBuffering(GFX_BOTTOM,false);
     consoleInit(GFX_BOTTOM,NULL);
     be_game_init(&game,&scene);
+    be_save_load(&game);
     if(!C3D_Init(C3D_DEFAULT_CMDBUF_SIZE)){
         printf("Citro3D could not initialize.\n");
         gfxExit();return 1;
@@ -377,6 +379,7 @@ int main(void){
                          ((held&KEY_A)||(held&KEY_TOUCH));
             be_audio_update(sound_enabled,shaving);
         }
+        if(last_audio_phase!=BE_WIN && game.phase==BE_WIN)be_save_write(&game);
         last_audio_phase=game.phase;
         status_display();
         C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
