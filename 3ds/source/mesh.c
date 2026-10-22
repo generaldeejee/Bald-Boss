@@ -111,13 +111,16 @@ void be_mesh_recolor_head(BeMesh *m){
             col[ch]=(p00[ch]*(1-fx)+p10[ch]*fx)*(1-fy)
                    +(p01[ch]*(1-fx)+p11[ch]*fx)*fy;
         }
-        float forward=MAX(0.0f,cosf((v->u-.5f)*2.0f*PI));
+        /* Quadratic face-side illumination avoids 37k trig calls per cut. */
+        float side=v->u-.5f;
+        float forward=MAX(0.0f,1.0f-16.0f*side*side);
         float shade=.79f+.20f*forward+.025f*(1.0f-v->v);
         float polished=.30f*col[3];
         float gloss=0.0f;
         if(v->v<.36f && col[3]>.01f){
             float lx=(v->u-.42f)*5.0f,ly=(v->v-.14f)*5.0f;
-            float hotspot=expf(-(lx*lx+ly*ly)*2.8f);
+            float hotspot=MAX(0.0f,1.0f-2.2f*(lx*lx+ly*ly));
+            hotspot*=hotspot;
             gloss=.16f*hotspot*col[3];
         }
         v->r=clampf(((col[0]*(1-polished)+248.0f*polished)/255.0f)*shade+gloss,0,1);
@@ -212,8 +215,17 @@ void be_mesh_rebuild_hair(BeMesh *m){
 void be_mesh_generate(BeMesh *m,int candidate){
     if(candidate<0)candidate=0;
     m->candidate=candidate%BE_CANDIDATES;
-    m->head_count=0;m->hair_count=0;m->removed=0;
-    skin_generate(m);
+    /* Skin and geometry do not depend on applicant or game mode.
+     * Reuse the heavy facial mesh on every retry/level selection. */
+    int new_head=(m->head_count!=BE_HEAD_VERTS);
+    m->hair_count=0;m->removed=0;
+    if(new_head){
+        m->head_count=0;
+        skin_generate(m);
+    }else{
+        memset(m->shaved_coverage,0,sizeof(m->shaved_coverage));
+    }
+    if(new_head){
     for(int i=0;i<BE_RINGS;i++){
         float ya=1.14f-2.16f*i/BE_RINGS,yb=1.14f-2.16f*(i+1)/BE_RINGS;
         for(int j=0;j<BE_SLICES;j++){
@@ -238,6 +250,7 @@ void be_mesh_generate(BeMesh *m,int candidate){
         m->head[m->head_count++]=center;
         m->head[m->head_count++]=a;
         m->head[m->head_count++]=b;
+    }
     }
     seed=0xB01D2026u+0x9e3779b9u*(uint32_t)m->candidate;
     const int goal=m->candidate==0?900:(m->candidate==1?BE_MAX_HAIR:760);
