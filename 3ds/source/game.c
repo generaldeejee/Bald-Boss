@@ -25,11 +25,13 @@ void be_game_select(BeGame *g,int candidate){
     g->cursor_x=200;g->cursor_y=105;
     g->yaw=0;g->pitch=0;g->zoom=0;g->previous_active=0;
     g->score=0;g->frames=0;g->combo=0;g->last_hits=0;
+    g->cleanup_bonus_given=0;
 }
 void be_game_start(BeGame *g){
     be_mesh_generate(g->mesh,g->candidate);
     g->phase=BE_PLAY;g->paused=0;g->score=0;g->frames=0;
     g->combo=0;g->last_cut=-999;g->last_hits=0;g->celebration=0;
+    g->cleanup_bonus_given=0;
     g->yaw=0;g->pitch=0;g->zoom=0;g->previous_active=0;
     g->cursor_x=200;g->cursor_y=105;
 }
@@ -65,9 +67,10 @@ static void finish_run(BeGame *g){
 void be_game_tick(BeGame *g){
     if(g->phase==BE_WIN){g->celebration++;return;}
     if(g->phase!=BE_PLAY||g->paused)return;
-    g->frames++;
+    /* The PSP edition freezes the clock for the very last strand. */
+    if(g->mode==BE_ZEN || g->mesh->hair_count-g->mesh->removed>1)g->frames++;
     if(g->mode==BE_CHALLENGE&&g->frames>=BE_TIME_LIMIT&&
-       g->mesh->removed<g->mesh->hair_count){
+       g->mesh->hair_count-g->mesh->removed>1){
         g->phase=BE_FAIL;
         g->paused=0;
     }
@@ -125,6 +128,7 @@ int be_game_shave_sweep(BeGame *g,float x0,float y0,float x1,float y1){
         if(ex*ex+ey*ey>1.0f)continue;
         h->gone=1;
         g->mesh->removed++;
+        be_mesh_polish_hair(g->mesh,h);
         hits++;
     }
     if(hits){
@@ -134,6 +138,13 @@ int be_game_shave_sweep(BeGame *g,float x0,float y0,float x1,float y1){
         g->last_cut=g->frames;
         g->last_hits=hits;
         be_mesh_rebuild_hair(g->mesh);
+        be_mesh_recolor_head(g->mesh);
+        if(g->mode==BE_CHALLENGE && !g->cleanup_bonus_given &&
+           g->mesh->hair_count-g->mesh->removed<=10 &&
+           g->mesh->hair_count-g->mesh->removed>0){
+            g->cleanup_bonus_given=1;
+            g->frames=g->frames>30*BE_FPS?g->frames-30*BE_FPS:0;
+        }
         if(g->mesh->removed>=g->mesh->hair_count)finish_run(g);
     }
     return hits;
@@ -160,7 +171,9 @@ int be_game_locate(BeGame *g){
             be_game_shave(g,sx,sy);
         }else{
             h->gone=1;g->mesh->removed++;g->score+=20;
+            be_mesh_polish_hair(g->mesh,h);
             be_mesh_rebuild_hair(g->mesh);
+            be_mesh_recolor_head(g->mesh);
             if(g->mesh->removed>=g->mesh->hair_count)finish_run(g);
         }
         return 1;
