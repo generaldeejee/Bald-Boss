@@ -62,9 +62,11 @@ static void status_display(void){
     /* Update console text at 10 Hz, and immediately on a mode/phase change.
        Crucially we NEVER clear the whole bottom LCD while playing. */
     static int previous_layout=-1,previous_candidate=-1,previous_epoch=-1;
+    static unsigned refresh_frame=0;
     int layout=game.phase+(game.phase==BE_PLAY && game.paused?10:0);
+    refresh_frame++;
     if(layout==previous_layout && previous_candidate==game.candidate &&
-       previous_epoch==status_epoch && game.frames%6!=0)return;
+       previous_epoch==status_epoch && refresh_frame%6!=0)return;
     if(layout!=previous_layout || previous_epoch!=status_epoch){
         for(int line=5;line<=23;line++)status_row(line,"");
         previous_layout=layout;
