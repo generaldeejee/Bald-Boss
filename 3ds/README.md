@@ -35,8 +35,11 @@ A GitHub Actions cross-compile passing is not a physical 3DS playtest.
   The game remains playable without DSP support.
 - High scores saved per applicant and per mode to
   `sdmc:/3ds/bald_elite_3ds/scores.txt` (when writable).
-- Bottom-screen text is updated only when necessary. Bottom LCD double
-  buffering is explicitly disabled to prevent old/new console-page flicker.
+- Bottom-screen text is updated only when necessary (at most ten times
+  per second during unchanged gameplay, and immediately when switching screen
+  or menu selection). Bottom LCD double buffering is explicitly disabled;
+  the console is never cleared wholesale each frame. The footer visibly says
+  **ARCADE BUILD**, distinguishing this playable version from the old preview.
 
 ## Controls
 
