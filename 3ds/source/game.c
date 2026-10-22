@@ -23,14 +23,14 @@ void be_game_select(BeGame *g,int candidate){
     be_mesh_generate(g->mesh,g->candidate);
     g->phase=BE_TITLE;g->paused=0;
     g->cursor_x=200;g->cursor_y=105;
-    g->yaw=0;g->pitch=0;
+    g->yaw=0;g->pitch=0;g->zoom=0;g->previous_active=0;
     g->score=0;g->frames=0;g->combo=0;g->last_hits=0;
 }
 void be_game_start(BeGame *g){
     be_mesh_generate(g->mesh,g->candidate);
     g->phase=BE_PLAY;g->paused=0;g->score=0;g->frames=0;
     g->combo=0;g->last_cut=-999;g->last_hits=0;g->celebration=0;
-    g->yaw=0;g->pitch=0;
+    g->yaw=0;g->pitch=0;g->zoom=0;g->previous_active=0;
     g->cursor_x=200;g->cursor_y=105;
 }
 void be_game_title(BeGame *g){
@@ -57,6 +57,7 @@ static void finish_run(BeGame *g){
     g->phase=BE_WIN;
     g->paused=0;
     g->celebration=0;
+    g->zoom=0;g->previous_active=0;
     int *record=&g->best[g->candidate][g->mode];
     if(g->score>*record)*record=g->score;
     g->total_shaves++;
@@ -72,6 +73,12 @@ void be_game_tick(BeGame *g){
     }
 }
 
+float be_game_distance(const BeGame *g){
+    static const float distances[3]={3.8f,3.1f,2.65f};
+    int level=CLAMP(g->zoom,0,2);
+    return distances[level];
+}
+
 /* Hair face visibility and screen coordinates (top screen, not bottom touch).
  * A small threshold permits the crown to be shaved while rotating the head.
  * The thick hair root is projected, not the tip, which is more stable. */
@@ -85,8 +92,9 @@ int be_game_project(const BeGame *g,const BeHair *h,float *x,float *y){
     float nx=cy*h->nx+sy*h->nz;
     float nz=cy*h->nz-sy*h->nx;
     float front=sp*h->ny+cp*nz;
-    if(front<-.03f || zr>=3.0f)return 0;
-    float inv=BE_FOCAL/(3.8f-zr);
+    float distance=be_game_distance(g);
+    if(front<-.03f || zr>=distance-.8f)return 0;
+    float inv=BE_FOCAL/(distance-zr);
     *x=200.0f+xx*inv;
     *y=120.0f-(yy-.06f)*inv;
     if(*x<1||*x>399||*y<1||*y>239)return 0;
@@ -94,18 +102,27 @@ int be_game_project(const BeGame *g,const BeHair *h,float *x,float *y){
     return 1;
 }
 
-int be_game_shave(BeGame *g,float x,float y){
+/* Segment / swept-circle collision means fast touchscreen strokes remove the
+ * intervening hairs instead of sampling only one point per video frame.
+ * Elliptical contact approximates the physical clipper width on the scalp. */
+int be_game_shave_sweep(BeGame *g,float x0,float y0,float x1,float y1){
     if(g->phase!=BE_PLAY||g->paused)return 0;
-    g->cursor_x=CLAMP(x,5.0f,395.0f);
-    g->cursor_y=CLAMP(y,4.0f,235.0f);
+    x0=CLAMP(x0,5.0f,395.0f);y0=CLAMP(y0,4.0f,235.0f);
+    x1=CLAMP(x1,5.0f,395.0f);y1=CLAMP(y1,4.0f,235.0f);
+    g->cursor_x=x1;
+    g->cursor_y=y1;
+    const float vx=(x1-x0)/16.0f,vy=(y1-y0)/14.0f;
+    const float len2=vx*vx+vy*vy;
     int hits=0;
     for(int i=0;i<g->mesh->hair_count;i++){
         BeHair *h=&g->mesh->strands[i];
         if(h->gone)continue;
         float sx,sy;
         if(!be_game_project(g,h,&sx,&sy))continue;
-        float dx=(sx-g->cursor_x)/16.0f,dy=(sy-g->cursor_y)/14.0f;
-        if(dx*dx+dy*dy>1.0f)continue;
+        float dx=(sx-x0)/16.0f,dy=(sy-y0)/14.0f;
+        float t=len2>1.0e-5f?CLAMP((dx*vx+dy*vy)/len2,0.0f,1.0f):0.0f;
+        float ex=dx-t*vx,ey=dy-t*vy;
+        if(ex*ex+ey*ey>1.0f)continue;
         h->gone=1;
         g->mesh->removed++;
         hits++;
@@ -120,6 +137,9 @@ int be_game_shave(BeGame *g,float x,float y){
         if(g->mesh->removed>=g->mesh->hair_count)finish_run(g);
     }
     return hits;
+}
+int be_game_shave(BeGame *g,float x,float y){
+    return be_game_shave_sweep(g,x,y,x,y);
 }
 
 /* Y assist: never force the player to search indefinitely for a few hairs.
