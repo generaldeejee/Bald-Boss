@@ -85,14 +85,14 @@ float be_game_distance(const BeGame *g){
 /* Hair face visibility and screen coordinates (top screen, not bottom touch).
  * A small threshold permits the crown to be shaved while rotating the head.
  * The thick hair root is projected, not the tip, which is more stable. */
-int be_game_project(const BeGame *g,const BeHair *h,float *x,float *y){
-    float cy=cosf(g->yaw),sy=sinf(g->yaw);
-    float cp=cosf(g->pitch),sp=sinf(g->pitch);
+/* One projection formula for both rendering and hit-testing. Hot swipe
+ * paths reuse frame trig rather than evaluating 4 sin/cos per hair. */
+static int project_fast(const BeGame *g,const BeHair *h,float *x,float *y,
+                        float cy,float sy,float cp,float sp){
     float xx=cy*h->x+sy*h->z;
     float zz=cy*h->z-sy*h->x;
     float yy=cp*h->y-sp*zz;
     float zr=sp*h->y+cp*zz;
-    float nx=cy*h->nx+sy*h->nz;
     float nz=cy*h->nz-sy*h->nx;
     float front=sp*h->ny+cp*nz;
     float distance=be_game_distance(g);
@@ -100,9 +100,11 @@ int be_game_project(const BeGame *g,const BeHair *h,float *x,float *y){
     float inv=BE_FOCAL/(distance-zr);
     *x=200.0f+xx*inv;
     *y=120.0f-(yy-.06f)*inv;
-    if(*x<1||*x>399||*y<1||*y>239)return 0;
-    (void)nx;
-    return 1;
+    return *x>=1 && *x<=399 && *y>=1 && *y<=239;
+}
+int be_game_project(const BeGame *g,const BeHair *h,float *x,float *y){
+    return project_fast(g,h,x,y,cosf(g->yaw),sinf(g->yaw),
+                        cosf(g->pitch),sinf(g->pitch));
 }
 
 /* Segment / swept-circle collision means fast touchscreen strokes remove the
@@ -117,11 +119,13 @@ int be_game_shave_sweep(BeGame *g,float x0,float y0,float x1,float y1){
     const float vx=(x1-x0)/16.0f,vy=(y1-y0)/14.0f;
     const float len2=vx*vx+vy*vy;
     int hits=0;
+    const float cy=cosf(g->yaw),sy=sinf(g->yaw);
+    const float cp=cosf(g->pitch),sp=sinf(g->pitch);
     for(int i=0;i<g->mesh->hair_count;i++){
         BeHair *h=&g->mesh->strands[i];
         if(h->gone)continue;
         float sx,sy;
-        if(!be_game_project(g,h,&sx,&sy))continue;
+        if(!project_fast(g,h,&sx,&sy,cy,sy,cp,sp))continue;
         float dx=(sx-x0)/16.0f,dy=(sy-y0)/14.0f;
         float t=len2>1.0e-5f?CLAMP((dx*vx+dy*vy)/len2,0.0f,1.0f):0.0f;
         float ex=dx-t*vx,ey=dy-t*vy;
