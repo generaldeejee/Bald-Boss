@@ -179,7 +179,7 @@ public final class GameState {
         return count;
     }
     public void shaveAt(float x,float y,int w,int h){shaveSweep(x,y,x,y,w,h);}
-    public void hintLast(int w,int h){
+    public void hintLast(int screenW,int screenH){
         if(phase!=PLAY||hairs.length-removed>8)return;
         for(Hair h:hairs)if(!h.gone){
             turn((float)Math.atan2(h.nx,h.nz)-yaw);
