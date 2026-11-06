@@ -70,6 +70,7 @@ public final class GameState {
         shaveSweep(strokeX,strokeY,x,y,width,height);
         strokeX=x;strokeY=y;cursorX=x;cursorY=y;
     }
+    public boolean shaving(){return stroke&&phase==PLAY&&!paused;}
     public void endShave(){stroke=false;cursorX=-1;cursorY=-1;}
     public void turn(float diff){yaw+=diff;if(yaw>Math.PI*2)yaw-=(float)(Math.PI*2);if(yaw< -Math.PI*2)yaw+=(float)(Math.PI*2);}
     public void tilt(float diff){pitch=Math.max(-.72f,Math.min(.78f,pitch+diff));}
