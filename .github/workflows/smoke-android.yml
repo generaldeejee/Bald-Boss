@@ -1,0 +1,65 @@
+name: Smoke test Bald Elite Android on emulator
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "android/**"
+      - ".github/workflows/smoke-android.yml"
+
+jobs:
+  android-emulator-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install Android SDK platform and Gradle
+        run: |
+          SDKMANAGER="/usr/local/lib/android/sdk/cmdline-tools/16.0/bin/sdkmanager"
+          test -x "$SDKMANAGER" || SDKMANAGER="$(find /usr/local/lib/android/sdk/cmdline-tools -type f -name sdkmanager | head -1)"
+          echo "ANDROID_HOME=/usr/local/lib/android/sdk" >> "$GITHUB_ENV"
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" "platforms;android-35" "build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Compile APK
+        run: gradle -p android --no-daemon :app:assembleDebug
+      - name: Boot virtual Android phone, launch game and exercise touch input
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 29
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: |
+            adb install android/app/build/outputs/apk/debug/app-debug.apk
+            adb shell am start -n com.baldelite.game/.MainActivity
+            sleep 8
+            adb shell pidof com.baldelite.game
+            adb shell screencap -p /sdcard/baldelite-title.png
+            adb pull /sdcard/baldelite-title.png android-title.png
+            # Press PLAY near lower-right in landscape coordinates
+            adb shell input tap 1680 954
+            sleep 2
+            adb shell input swipe 1000 420 1150 480 600
+            sleep 2
+            adb shell pidof com.baldelite.game
+            adb shell screencap -p /sdcard/baldelite-gameplay.png
+            adb pull /sdcard/baldelite-gameplay.png android-gameplay.png
+            test -s android-gameplay.png
+      - name: Upload emulator screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: BaldElite-Android-Emulator-Screenshots
+          path: |
+            android-title.png
+            android-gameplay.png
+          if-no-files-found: warn
