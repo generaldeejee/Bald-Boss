@@ -63,7 +63,7 @@ public final class HudView extends View {
                 button(canvas,"PREV","PREV",9,224,86,259,false);
                 button(canvas,"NEXT","NEXT",92,224,170,259,false);
                 button(canvas,"ZEN / 90S","MODE",175,224,292,259,false);
-                button(canvas,"SOUND","SOUND",297,224,372,259,false);
+                button(canvas,game.sound?"MUSIC ON":"MUSIC OFF","SOUND",297,224,372,259,false);
                 button(canvas,"PLAY","PLAY",377,224,474,259,true);
             }else if(game.phase==GameState.PLAY){
                 float fraction=(float)game.removed/Math.max(1,game.hairs.length);
