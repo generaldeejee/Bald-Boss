@@ -105,3 +105,36 @@ gameplay, score saving and touch controls are preserved.
 
 The software build confirms installation-package integrity. A physical
 Android device is still required to validate appearance, shading and FPS.
+
+
+## Bald Elite v2.3 — Profile, HUD & Hair Overhaul
+
+The 2.2 sideways-profile screenshot exposed two actual problems:
+the front portrait image was still sampled all the way around the
+cylindrical 3D head, and the onscreen HUD covered much of the 3D model.
+v2.3 addresses both in software (not just a mock-up).
+
+**Face mapping:** Face shader now reads separate photographic face and
+per-applicant, seamless side/back scalp atlases. Facial detail is confined
+to the frontal section in UV-space, and smoothly blended to skin after
+45 degrees, fully scalp at ~90 degrees. This prevents extraneous noses,
+eyes and lips from stretching over side and rear surfaces.
+
+**HUD:** Gameplay info now resides in a single 28px-high HUD strip with a
+four-pixel progress bar at y34. The controller dock at y241 is only
+28 pixels high, leaving the middle 39..240 region completely clear for
+the 3D head. Existing functional buttons, pause, and 2-finger orbit remain.
+
+**Hair:** The former single opaque triangular hair is replaced by
+three-dimensional, nine-vertex curved/tapered ribbon geometry with
+slightly individualized lengths, thickness, highlights, direction and
+natural temple recession. Clipped follicles leave a very short temporary
+stubble for half a second then vanish, without increasing the number of
+touches needed to complete the 90-second mission.
+
+**Installation:** v2.3 package `com.baldelite.club.profile` runs
+alongside the previous version because Android debug-signing keys may differ.
+The v2.2 save data remains untouched. No internet or microphone needed.
+
+**Verification:** CI builds the Android APK and checks the portrait,
+side-scalp, and music assets; physical-device profiling remains necessary.
