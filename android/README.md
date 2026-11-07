@@ -78,3 +78,30 @@ This version intentionally uses `com.baldelite.club` so it installs
 High scores are not yet shared between different app IDs.
 
 See `android/RELEASE_NOTES_v2.1.md` for complete release notes.
+
+## Bald Elite v2.2 — Seamless Neck & Natural Skin
+
+Corrects a significant anatomical error in the procedural 3D character.
+The v2.1 neck was a cylinder centred behind the head, causing a visible
+disconnected seam. The v2.2 neck now begins on the **exact last head ring**,
+with matching positions, angles, UVs and normals, and gradually transitions
+to the collar through a smooth throat curve. Both meshes use the same angular
+tessellation so no hole is visible while orbiting the head.
+
+The old Canvas circles/flat facial shapes have been superseded by a
+reproducible **2048 x 2048** seamless skin UV atlas generated in
+`android/tools/make_face_textures.py`. Each of the three applicants gets
+an individual complexion with natural almond eyelids, iris fibres, fine brow
+strands, anatomically softened nostrils and lips, cheeks, pores and stubble.
+The generator also creates a packed tangent-detail/specular atlas used
+by the ES 2.0 shader to give the crown smoother realistic skin highlights.
+Standard graphics mode downscales the same real source skin atlas to 1024px.
+
+CI verifies that all texture assets exist and uploads example images for
+inspection. This build is published as `com.baldelite.club.hd` to install
+alongside v2.1 without losing existing scores, since the prior APK was signed
+with a temporary key. All club jokes, art, 44.1 kHz original PSP music,
+gameplay, score saving and touch controls are preserved.
+
+The software build confirms installation-package integrity. A physical
+Android device is still required to validate appearance, shading and FPS.
