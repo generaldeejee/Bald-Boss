@@ -1,4 +1,4 @@
-# Bald Elite — native Android edition
+# Bald Elite — native Android edition (v1.1)
 
 **Real Android APK, not an emulator.** Original OpenGL ES 2.0 3D renderer with a procedural, textured head and multiple haircuts. Uses the Bald Elite/3DS gameplay loop, rewritten in Java for Android devices.
 
@@ -13,6 +13,8 @@
 
 ## Build
 From the `android` directory, run `gradle assembleDebug` with Android SDK 35 and JDK 17.
+The v1.1 APK targets Android 15 (API 35), eliminating the outdated-app warning on Android 16/17 while preserving Android 6+ installation compatibility. Because GitHub CI builds use fresh debug-signing certificates, Android may reject an update over v1.0 with INSTALL_FAILED_UPDATE_INCOMPATIBLE; if that happens, uninstall v1.0 first (note that locally saved scores are then removed). For a seamless upgrade path in later versions, use a persistent signing key held outside the public repository.
+
 The generated APK is at `app/build/outputs/apk/debug/app-debug.apk`.
 The repository workflow `Build Bald Elite Android` builds and uploads the APK automatically.
 
