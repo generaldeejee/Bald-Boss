@@ -28,7 +28,7 @@ public final class GameRenderer implements GLSurfaceView.Renderer {
     private final GameState game;
     private final Context context;
     private int surfaceWidth=960,surfaceHeight=540;
-    private int faceProgram,hairProgram,backgroundProgram,faceTexture,backgroundTexture,detailTexture;
+    private int faceProgram,hairProgram,backgroundProgram,faceTexture,scalpTexture,backgroundTexture,detailTexture;
     private FloatBuffer faceVertices,hairVertices,backgroundVertices;
     private int faceCount=0,hairCount=0,lastCandidate=-1,lastSkinCandidate=-1;
     private boolean lastQuality=false;
@@ -44,7 +44,7 @@ public final class GameRenderer implements GLSurfaceView.Renderer {
         "vNormal=n;vUV=aUV;gl_Position=uMVP*vec4(aPosition,1.0);}";
     private static final String FACE_FRAG=
         "precision mediump float;varying vec2 vUV;varying float vLight;varying vec3 vNormal;"+
-        "uniform sampler2D uTex;uniform sampler2D uDetail;uniform vec3 uTint;"+
+        "uniform sampler2D uTex;uniform sampler2D uScalp;uniform sampler2D uDetail;uniform vec3 uTint;"+
         "void main(){vec3 detail=texture2D(uDetail,vUV).rgb;"+
         "vec3 n=normalize(vNormal+vec3((detail.r-.5)*.095,(detail.g-.5)*.095,0.0));"+
         "vec3 key=normalize(vec3(-0.50,0.72,0.86));"+
@@ -54,7 +54,11 @@ public final class GameRenderer implements GLSurfaceView.Renderer {
         "float shine=pow(max(dot(r,eye),0.0),mix(58.0,18.0,smoothness))*mix(0.10,0.51,smoothness);"+
         "float bounce=max(dot(n,normalize(vec3(0.52,0.22,-0.74))),0.0)*0.05;"+
         "float rim=pow(1.0-max(dot(n,eye),0.0),3.0)*0.17;"+
-        "vec3 base=texture2D(uTex,vUV).rgb*uTint;"+
+        "float faceMask=1.0-smoothstep(0.125,0.245,abs(vUV.x-0.5));"+
+        "faceMask*=1.0-smoothstep(0.87,0.99,vUV.y);"+
+        "vec3 face=texture2D(uTex,vUV).rgb;"+
+        "vec3 scalp=texture2D(uScalp,vUV).rgb;"+
+        "vec3 base=mix(scalp,face,faceMask)*uTint;"+
         "vec3 result=base*(vLight+bounce)+vec3(1.0,0.87,0.67)*shine+vec3(0.42,0.26,0.66)*rim;"+
         "gl_FragColor=vec4(clamp(result,0.0,1.0),1.0);}";
     private static final String HAIR_VERT=
@@ -190,6 +194,19 @@ public final class GameRenderer implements GLSurfaceView.Renderer {
         p.setStyle(Paint.Style.FILL);
         return b;
     }
+    private Bitmap createScalp(){
+        try(InputStream src=context.getAssets().open("scalp_"+game.candidate+".jpg")){
+            BitmapFactory.Options options=new BitmapFactory.Options();
+            options.inSampleSize=game.highDetail?1:2;
+            Bitmap result=BitmapFactory.decodeStream(src,null,options);
+            if(result!=null)return result;
+        }catch(Exception ignored){}
+        Bitmap fallback=Bitmap.createBitmap(16,16,Bitmap.Config.ARGB_8888);
+        int color=game.candidate==1?0xffc18b77:
+                  (game.candidate==2?0xffd8aa89:0xffcb997c);
+        fallback.eraseColor(color);
+        return fallback;
+    }
     private Bitmap createDetailTexture(){
         try(InputStream source=context.getAssets().open("skin_detail.jpg")){
             Bitmap image=BitmapFactory.decodeStream(source);
@@ -314,38 +331,83 @@ public final class GameRenderer implements GLSurfaceView.Renderer {
         }
         faceVertices.position(0);
     }
-    private void addRibbon(GameState.Hair hair,int strand,FloatBuffer out){
-        // A tapering, triangular hair ribbon with a subtle highlight at the tip.
-        float[] rgb=game.candidate==0?new float[]{.25f,.15f,.105f}:
-                    game.candidate==1?new float[]{.90f,.20f,.47f}:
-                    new float[]{.76f,.74f,.68f};
-        float bright=(strand%9)*.025f;
-        float tx=hair.nz,tz=-hair.nx;
-        float width=game.candidate==1?.0095f:.006f;
-        float rootX=hair.x+hair.nx*.01f,rootY=hair.y+hair.ny*.01f,rootZ=hair.z+hair.nz*.01f;
-        float tipX=rootX+hair.nx*hair.len*.78f;
-        float tipY=rootY+hair.len*.72f;
-        float tipZ=rootZ+hair.nz*hair.len*.78f;
-        ribbonVertex(out,rootX-tx*width,rootY,rootZ-tz*width,rgb,bright);
-        ribbonVertex(out,rootX+tx*width,rootY,rootZ+tz*width,rgb,bright);
-        ribbonVertex(out,tipX,tipY,tipZ,rgb,bright+.16f);
+    private static final float[][] HAIR_PALETTE={
+        {.23f,.145f,.095f}, // dark natural short cut
+        {.72f,.17f,.32f},   // vivid but shaded punk strands
+        {.43f,.42f,.40f}    // realistic salt and pepper
+    };
+    // Three-segment tapered hair card, bending in a characteristic follicle
+    // direction. Two triangles for root->mid and a tapered tip triangle.
+    // Each vertex has color for warm root shadows and natural highlights.
+    private void addRibbon(GameState.Hair h,int index,FloatBuffer out){
+        final float[] base=HAIR_PALETTE[game.candidate];
+        float tint=h.tint;
+        float shade=(index%17-8)*.009f;
+        float[] rgb={
+            Math.max(.04f,Math.min(.96f,base[0]*tint+shade)),
+            Math.max(.04f,Math.min(.96f,base[1]*tint+shade*.65f)),
+            Math.max(.04f,Math.min(.96f,base[2]*tint+shade*.40f))
+        };
+        float tangentX=h.nz,tangentZ=-h.nx;
+        float width=h.width*(game.highDetail?1f:1.08f);
+        float lx=h.x+h.nx*.014f,ly=h.y+h.ny*.014f,lz=h.z+h.nz*.014f;
+        float l=h.len;
+        float midx=lx+h.nx*l*.30f+tangentX*h.curve*l*.12f;
+        float midy=ly+l*.54f;
+        float midz=lz+h.nz*l*.30f+tangentZ*h.curve*l*.12f;
+        float tipx=lx+h.nx*l*.59f+tangentX*h.curve*l*.39f;
+        float tipy=ly+l*(.77f+h.splay*.09f);
+        float tipz=lz+h.nz*l*.59f+tangentZ*h.curve*l*.39f;
+        // Curved trapezoid / leaf, not an opaque rigid triangle.
+        hairV(out,lx-tangentX*width,ly,lz-tangentZ*width,rgb,-.075f);
+        hairV(out,lx+tangentX*width,ly,lz+tangentZ*width,rgb,-.035f);
+        hairV(out,midx-tangentX*width*.58f,midy,midz-tangentZ*width*.58f,rgb,.075f);
+        hairV(out,midx-tangentX*width*.58f,midy,midz-tangentZ*width*.58f,rgb,.075f);
+        hairV(out,lx+tangentX*width,ly,lz+tangentZ*width,rgb,-.035f);
+        hairV(out,midx+tangentX*width*.58f,midy,midz+tangentZ*width*.58f,rgb,.12f);
+        hairV(out,midx-tangentX*width*.58f,midy,midz-tangentZ*width*.58f,rgb,.075f);
+        hairV(out,midx+tangentX*width*.58f,midy,midz+tangentZ*width*.58f,rgb,.12f);
+        hairV(out,tipx,tipy,tipz,rgb,.19f);
     }
-    private static void ribbonVertex(FloatBuffer out,float x,float y,float z,float[] rgb,float bright){
+    private static void hairV(FloatBuffer out,float x,float y,float z,float[] rgb,float shade){
         out.put(x).put(y).put(z);
-        out.put(Math.min(1f,rgb[0]+bright)).put(Math.min(1f,rgb[1]+bright*.7f)).put(Math.min(1f,rgb[2]+bright*.5f));
+        out.put(Math.max(.0f,Math.min(1f,rgb[0]+shade)));
+        out.put(Math.max(.0f,Math.min(1f,rgb[1]+shade*.8f)));
+        out.put(Math.max(.0f,Math.min(1f,rgb[2]+shade*.7f)));
+    }
+    private void addStubble(GameState.Hair h,int index,FloatBuffer out){
+        float age=Math.max(0f,game.seconds-h.cutAt);
+        float fade=Math.max(0f,1f-age/.50f);
+        float l=.006f+.019f*fade;
+        float tangentX=h.nz,tangentZ=-h.nx;
+        float x=h.x+h.nx*.012f,y=h.y+h.ny*.012f,z=h.z+h.nz*.012f;
+        float width=h.width*.48f;
+        float[] rgb=HAIR_PALETTE[game.candidate];
+        float shading=-.075f+.14f*(1f-fade);
+        hairV(out,x-tangentX*width,y,z-tangentZ*width,rgb,shading);
+        hairV(out,x+tangentX*width,y,z+tangentZ*width,rgb,shading);
+        hairV(out,x+h.nx*l,y+l*.55f,z+h.nz*l,rgb,shading+.08f);
     }
     private void updateHair(){
-        int remain=0;
-        for(GameState.Hair h:game.hairs)if(!h.gone)remain++;
-        hairCount=remain*3;
-        int count=Math.max(6,hairCount*6);
-        if(hairVertices==null||hairVertices.capacity()<count)hairVertices=floats(count);
+        // Only redrawn when clipping occurs or a short-lived stubble shrinks.
+        // Keeps each shave smooth on mid-range Android tablets.
+        int verts=0;
+        for(GameState.Hair h:game.hairs){
+            if(!h.gone)verts+=9;
+            else if(game.seconds-h.cutAt<.50f)verts+=3;
+        }
+        hairCount=verts;
+        int floatsNeeded=Math.max(6,verts*6);
+        if(hairVertices==null||hairVertices.capacity()<floatsNeeded)
+            hairVertices=floats(floatsNeeded);
         hairVertices.clear();
         for(int i=0;i<game.hairs.length;i++){
             GameState.Hair h=game.hairs[i];
             if(!h.gone)addRibbon(h,i,hairVertices);
+            else if(game.seconds-h.cutAt<.50f)addStubble(h,i,hairVertices);
         }
-        hairVertices.flip();game.hairDirty=false;
+        hairVertices.flip();
+        game.hairDirty=false;
     }
     @Override public void onSurfaceCreated(GL10 unused,EGLConfig config){
         GLES20.glClearColor(.04f,.07f,.13f,1f);
@@ -356,6 +418,7 @@ public final class GameRenderer implements GLSurfaceView.Renderer {
         hairProgram=program(HAIR_VERT,HAIR_FRAG);
         backgroundProgram=program(BG_VERT,BG_FRAG);
         faceTexture=texture(createFace());
+        scalpTexture=texture(createScalp());
         detailTexture=texture(createDetailTexture());
         backgroundTexture=texture(createBackground());
         backgroundVertices=floats(16);
@@ -405,9 +468,10 @@ public final class GameRenderer implements GLSurfaceView.Renderer {
             game.update(dt);
             if(game.highDetail!=lastQuality||game.candidate!=lastSkinCandidate){
                 if(game.highDetail!=lastQuality)createHead();
-                int[] previous={faceTexture};
-                GLES20.glDeleteTextures(1,previous,0);
+                int[] previous={faceTexture,scalpTexture};
+                GLES20.glDeleteTextures(2,previous,0);
                 faceTexture=texture(createFace());
+                scalpTexture=texture(createScalp());
                 lastQuality=game.highDetail;
                 lastSkinCandidate=game.candidate;
             }
@@ -433,6 +497,9 @@ public final class GameRenderer implements GLSurfaceView.Renderer {
             GLES20.glActiveTexture(GLES20.GL_TEXTURE1);
             GLES20.glBindTexture(GLES20.GL_TEXTURE_2D,detailTexture);
             GLES20.glUniform1i(GLES20.glGetUniformLocation(faceProgram,"uDetail"),1);
+            GLES20.glActiveTexture(GLES20.GL_TEXTURE2);
+            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D,scalpTexture);
+            GLES20.glUniform1i(GLES20.glGetUniformLocation(faceProgram,"uScalp"),2);
             attrib(faceProgram,"aPosition",3,32,faceVertices,0);
             attrib(faceProgram,"aUV",2,32,faceVertices,3);
             attrib(faceProgram,"aNormal",3,32,faceVertices,5);
