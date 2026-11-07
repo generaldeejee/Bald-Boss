@@ -138,3 +138,35 @@ The v2.2 save data remains untouched. No internet or microphone needed.
 
 **Verification:** CI builds the Android APK and checks the portrait,
 side-scalp, and music assets; physical-device profiling remains necessary.
+
+
+## Bald Elite v2.4 — TRUE HEAD / PROFILE REBUILD
+
+The v2.3 player screenshot showed that the ears and head profile still did not
+look convincing, and that the number of hairs could be clipped on ultrawide
+Samsung screens. v2.4 makes these functional corrections:
+
+- **Sculpted skull**: recomputed occiput curvature and temple hollow on the
+  gameplay's actual headPoint() surface, with a reduced jaw taper and removal
+  of the previous fake painted-on ear swelling.
+- **Real 3D ear shells**: curved anatomical cartilage attached at a sampled
+  skull socket, with a dimensional antihelix, concha depression and matching
+  back shell. Each ear has an independent 512px radial ear-material texture.
+- **Four distinct shader regions**: explicit vertex-region attribute routes
+  the face, side/back scalp, neck and ears through separate material controls.
+  Front portrait details are restricted to the frontal 0.085–0.17 UV band,
+  replacing the old 0.125–0.245 smear across the visible side profile.
+- **Scalp and ear materials** are unique per candidate and created by the
+  `make_profile_scalp.py` asset generator, so there can be no portrait eye
+  or mouth graphics baked into the side of the head.
+- **Gameplay HUD** respects extra-wide phone screens with a uniform UI scale
+  and centered safe frame. The hair counter is now right-aligned instead of
+  centered at the edge, avoiding clipped numbers. Touch hit targets are
+  transformed using the identical coordinate transform.
+- **v2.3's curved hair ribbons, temporary stubble, club lore, luxury art,
+  original stereo PSP music and gameplay are preserved.**
+
+The 2.4 application ID `com.baldelite.club.truehead` installs alongside
+2.3 without replacing its saves. Actual visual fidelity still requires
+photographs/screenshots from a physical Android device; successful CI does
+not prove the ear silhouette and every texture seam look realistic.
