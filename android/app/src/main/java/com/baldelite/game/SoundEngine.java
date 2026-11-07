@@ -12,10 +12,13 @@ import android.util.Log;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 
-/** Bald Elite Deluxe's original high-definition PSP soundtrack.
- * SOURCE: the same 44.1kHz stereo wav generators used by the PSP homebrew,
- * now delivered as high-quality Vorbis instead of 11.025kHz 8-bit PCM.
- * Game music (instrumental) and club/menu music (sung) loop independently.
+/** Bald Elite v2.5 live-band-style soundtrack with sampled instruments.
+ * SOURCE: the game's own fresh 44.1-kHz arrangements, rendered offline
+ * with recorded guitar, bass, drums, electric piano and sax SoundFont samples.
+ * These are sampled instrument performances, not recordings of live players.
+ * Delivered to Android as 44.1-kHz stereo Vorbis, not streamed MIDI notes.
+ * Both the funk-rock gameplay track and the club-lounge menu track loop.
+ * The original PSP spoken victory sample is preserved.
  *
  * The PSP victory voice, clipper motor, shaving swishes, UI chimes and crowd
  * cheers are mixed in a separate 44.1-kHz AudioTrack. Volume ducking lets
