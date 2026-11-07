@@ -4,17 +4,17 @@ import android.content.SharedPreferences;
 import java.util.Random;
 
 public final class GameState {
-    public static final int TITLE=0, PLAY=1, WIN=2, FAIL=3;
+    public static final int TITLE=0, PLAY=1, WIN=2, FAIL=3, INTRO=4;
     public static final int CHALLENGE=0, ZEN=1;
     public static final String[] NAMES={"THE BUSINESSMAN","THE PUNK","THE PROFESSOR"};
     public static final int[] COUNTS={900,1250,760};
     private final SharedPreferences prefs;
     public int phase=TITLE, candidate=0, mode=CHALLENGE, zoom=0;
-    public boolean paused=false, sound=true;
+    public boolean paused=false, sound=true, highDetail=true;
     public float yaw=0, pitch=0, seconds=0, cursorX=-1, cursorY=-1;
     public int score=0, combo=0, removed=0, best=0, total=0, lastHits=0;
     // Increment-only event counters, sampled by the independent PSP audio thread.
-    public int cutSerial=0, winSerial=0;
+    public int cutSerial=0, winSerial=0, uiSerial=0;
     public float comboTimer=0;
     public Hair[] hairs=new Hair[0];
     public boolean hairDirty=true;
@@ -30,18 +30,24 @@ public final class GameState {
     public GameState(SharedPreferences preferences){
         prefs=preferences;
         sound=prefs.getBoolean("sound",true);
+        highDetail=prefs.getBoolean("high_detail",true);
         select(0);
+        phase=INTRO;
     }
+    public void enterClub(){phase=TITLE;uiSerial++;}
+    public void toggleQuality(){highDetail=!highDetail;prefs.edit().putBoolean("high_detail",highDetail).apply();uiSerial++;}
     public void select(int c){
+        uiSerial++;
         candidate=(c+3)%3;
         yaw=pitch=0;zoom=0;paused=false;phase=TITLE;
         score=combo=removed=lastHits=0;seconds=0;stroke=false;bonus=false;
         regenerate();loadBest();
     }
     private void loadBest(){best=prefs.getInt("best_"+candidate+"_"+mode,0);}
-    public void setMode(int m){mode=m;loadBest();}
-    public void toggleSound(){sound=!sound;prefs.edit().putBoolean("sound",sound).apply();}
+    public void setMode(int m){mode=m;loadBest();uiSerial++;}
+    public void toggleSound(){sound=!sound;prefs.edit().putBoolean("sound",sound).apply();uiSerial++;}
     public void start(){
+        uiSerial++;
         phase=PLAY;paused=false;score=0;combo=0;removed=0;lastHits=0;seconds=0;
         yaw=pitch=0;zoom=0;stroke=false;comboTimer=0;bonus=false;
         regenerate();loadBest();
@@ -59,7 +65,7 @@ public final class GameState {
         comboTimer+=dt;
         if(comboTimer>1f)combo=0;
         if(mode==CHALLENGE&&seconds>=90&&removed<hairs.length){
-            phase=FAIL;stroke=false;
+            phase=FAIL;stroke=false;uiSerial++;
         }
     }
     public void beginShave(float x,float y){
@@ -78,7 +84,7 @@ public final class GameState {
     public void tilt(float diff){pitch=Math.max(-.72f,Math.min(.78f,pitch+diff));}
     public void changeZoom(){zoom=(zoom+1)%3;}
     private void win(){
-        winSerial++;
+        winSerial++;uiSerial++;
         phase=WIN;paused=false;stroke=false;total++;
         if(score>best){best=score;prefs.edit().putInt("best_"+candidate+"_"+mode,best).apply();}
     }
