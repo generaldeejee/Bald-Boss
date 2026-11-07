@@ -36,3 +36,15 @@ Android's audio mixer also recreates the PSP clipper motor, contact/cut SFX and 
 Launcher icons are generated at 5 densities using the project's original custom Bald Elite design and Pillow. The app does not load assets from the internet.
 
 **Building:** GitHub Actions downloads the existing verified PSP audio generation artifact from run 39478827781. The artifact is subject to GitHub's retention period; once expired, rerun the PSP audio generation workflow and update the run-id in `.github/workflows/build-android.yml`. For offline development, provide those headers yourself and run `python3 android/tools/prepare_assets.py --music-header <path> --voice-header <path>` prior to Gradle.
+
+
+## Bald Elite Android v2.0 DELUXE
+
+- A separate app ID `com.baldelite.deluxe` allows installing alongside v1.2 without overwriting or deleting existing records. The Deluxe app has its own score storage.
+- NEW INTRO: Club invitation and entry, with original deluxe club concept artwork.
+- MENU: atmospheric barbershop background, three applicant previews, graphic quality toggle and music control.
+- VICTORY: gold confetti, high-score display, champion announcement and cheering effect.
+- RENDERER: 86x120 face mesh, new neck geometry, 1024x1024 portrait atlas, specular skin lighting, rim fill, ribbon hair cards, 512px and lower polygon Standard mode.
+- AUDIO: the same original PSP music masters are now regenerated as 44.1kHz stereo Ogg Vorbis quality 7. The title and victory use vocals, gameplay uses the instrumental. Effects include classic clipper, enhanced shave, victory voice, menu stingers and synthesized crowd applause.
+- ASSETS: The code creates reproducible club scene backgrounds with Pillow. A separately packaged Deluxe APK may substitute the high-resolution commissioned artwork (club_intro, club_menu, club_victory and club_crest) from the user's image-generation session. This repository deliberately does not claim that generated art is contained in its source tree.
+- Android minSdk23 / targetSdk35; no internet permission and no telemetry.
