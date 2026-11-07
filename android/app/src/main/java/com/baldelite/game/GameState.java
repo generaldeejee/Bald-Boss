@@ -147,6 +147,13 @@ public final class GameState {
         float sa=(float)Math.sin(a),ca=(float)Math.cos(a);
         float x=interpolate(y,W)*sa;
         float z=interpolate(y,C)+interpolate(y,D)*ca;
+        // Anatomical profile pass: true rounded back of skull above the nape,
+        // temple hollow, gradual mandible reduction, not a straight slab.
+        float rear=(float)Math.exp(-Math.pow((Math.abs(a)-2.55f)/.74f,2));
+        z-=.075f*rear*gauss((y-.38f)/.63f);
+        float side=(float)Math.exp(-Math.pow((Math.abs(a)-1.45f)/.47f,2));
+        x+=sa*.020f*side*gauss((y-.22f)/.53f);
+        x-=sa*.024f*side*gauss((y+.84f)/.23f);
         // v2.1: true temporal, cheekbone, jawline and chin sculpting.
         float cheek=gauss((y+.06f)/.23f);
         float cheekSide=gauss((Math.abs(a)-.67f)/.32f);
@@ -173,9 +180,12 @@ public final class GameState {
         z+=.026f*eyes*gauss((y+.08f)/.20f);
         float mid=gauss(a/.34f);
         z+=mid*(.022f*gauss((y+.53f)/.050f)+.034f*gauss((y+.62f)/.060f)+.035f*gauss((y+.80f)/.125f));
-        float ear=(gauss((a-1.58f)/.22f)+gauss((a+1.58f)/.22f))*gauss((y+.11f)/.18f);
-        x+=sa*.095f*ear;
-        if(ca>0)z+=ca*.012f*ear;
+        // Ear is now a separate anatomical mesh anchored in the temple.
+        // No fake ear-colored bump on the cranium: it used to make a lumpy
+        // profile and produced a dark painted-on rectangle when seen sideways.
+        float earSocket=(gauss((a-1.50f)/.22f)+
+                         gauss((a+1.50f)/.22f))*gauss((y+.14f)/.22f);
+        x-=sa*.012f*earSocket;
         return new float[]{x,y,z};
     }
     private void regenerate(){
