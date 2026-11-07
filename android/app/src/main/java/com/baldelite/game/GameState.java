@@ -53,9 +53,10 @@ public final class GameState {
     private float strokeX,strokeY;
     private boolean stroke=false;
     private boolean bonus=false;
+    private float lastCutAt=-100f;
 
     public static final class Hair {
-        public float x,y,z,nx,ny,nz,len;
+        public float x,y,z,nx,ny,nz,len,curve,splay,width,tint,cutAt=-100f;
         public boolean gone;
     }
     public GameState(SharedPreferences preferences){
@@ -88,7 +89,7 @@ public final class GameState {
         uiSerial++;
         aboutOpen=false;
         phase=PLAY;paused=false;score=0;combo=0;removed=0;lastHits=0;seconds=0;
-        yaw=pitch=0;zoom=0;stroke=false;comboTimer=0;bonus=false;
+        yaw=pitch=0;zoom=0;stroke=false;comboTimer=0;bonus=false;lastCutAt=-100f;
         regenerate();loadBest();
     }
     public void menu(){select(candidate);}
@@ -103,6 +104,10 @@ public final class GameState {
         seconds+=dt;
         comboTimer+=dt;
         if(comboTimer>1f)combo=0;
+        // A clipped follicle remains as a tiny dark stubble for a fraction
+        // of a second before becoming cleanly bald. Refresh only 12Hz.
+        if(seconds-lastCutAt<.56f &&
+           (int)(seconds*12f)!=(int)((seconds-dt)*12f))hairDirty=true;
         if(mode==CHALLENGE&&seconds>=90&&removed<hairs.length){
             phase=FAIL;stroke=false;uiSerial++;
         }
@@ -179,8 +184,15 @@ public final class GameState {
         int count=0,attempt=0;
         while(count<hairs.length&&attempt<hairs.length*100){
             attempt++;
-            float y=.34f+.79f*rand.nextFloat();
+            float y=.28f+.85f*rand.nextFloat();
             float a=(rand.nextFloat()-.5f)*(float)(2*Math.PI);
+            float front=Math.max(0f,(float)Math.cos(a));
+            // Receding at the temples, lower at the back, avoiding a stripe
+            // of hairs through the eyebrows or over the face.
+            float hairline=.34f+.43f*front*front;
+            float temples=(float)Math.exp(-Math.pow((Math.abs(a)-1.05f)/.27f,2));
+            hairline+=.15f*temples;
+            if(y<hairline)continue;
             float[] p=headPoint(y,a);
             if(candidate==1&&Math.abs(p[0])>.28f)continue;
             if(candidate==2){
@@ -193,7 +205,13 @@ public final class GameState {
             float nx=(float)Math.sin(a),nz=(float)Math.cos(a),ny=Math.max(.10f,(y-.2f)*.40f);
             float inverse=(float)(1.0/Math.sqrt(nx*nx+ny*ny+nz*nz));
             h.nx=nx*inverse;h.ny=ny*inverse;h.nz=nz*inverse;
-            h.len=candidate==0?.026f+.020f*rand.nextFloat():(candidate==1?.115f+.075f*rand.nextFloat():.032f+.035f*rand.nextFloat());
+            h.len=candidate==0?.048f+.040f*rand.nextFloat():
+                  (candidate==1?.118f+.125f*rand.nextFloat():.036f+.045f*rand.nextFloat());
+            h.curve=(rand.nextFloat()-.5f)*(candidate==1?.62f:.34f);
+            h.splay=(rand.nextFloat()-.5f)*.45f;
+            h.width=.0022f+.0031f*rand.nextFloat();
+            h.tint=.71f+.29f*rand.nextFloat();
+            h.cutAt=-100f;
             hairs[count++]=h;
         }
         if(count<hairs.length){
@@ -225,10 +243,11 @@ public final class GameState {
             float q=len2>1f?Math.max(0,Math.min(1,((sx-x0)*vx+(py-y0)*vy)/len2)):0;
             float dx=sx-x0-q*vx,dy=py-y0-q*vy;
             if(dx*dx+dy*dy>r2)continue;
-            h.gone=true;removed++;count++;
+            h.gone=true;h.cutAt=seconds;removed++;count++;
         }
         if(count>0){
             cutSerial++;
+            lastCutAt=seconds;
             hairDirty=true;
             if(comboTimer>.5f)combo=0;
             combo=Math.min(100,combo+count);
@@ -248,7 +267,7 @@ public final class GameState {
         if(phase!=PLAY||hairs.length-removed>8)return;
         for(Hair h:hairs)if(!h.gone){
             turn((float)Math.atan2(h.nx,h.nz)-yaw);
-            h.gone=true;removed++;score+=20;hairDirty=true;cutSerial++;
+            h.gone=true;h.cutAt=seconds;lastCutAt=seconds;removed++;score+=20;hairDirty=true;cutSerial++;
             if(removed==hairs.length)win();
             break;
         }
