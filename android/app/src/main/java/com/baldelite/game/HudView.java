@@ -108,16 +108,23 @@ public final class HudView extends View {
         synchronized(game){
             if(game.phase==GameState.INTRO){
                 art(c,introArt);
-                panel(c,75,191,405,228,0xd112102a,8);
-                text(c,"AN INVITATION TO THE BALD ELITE",240,208,13,GOLD,true);
-                text(c,"Only the perfectly polished shall enter.",240,222,9,WHITE,true);
-                button(c,"ENTER THE CLUB","ENTER",145,233,335,265,true);
-                float t=SystemClock.uptimeMillis()*.0027f;
-                color(0x77f6ca7a);
-                p.setStrokeWidth(2.1f);p.setStyle(Paint.Style.STROKE);
-                c.drawRoundRect(new RectF(143,231,337,267),8,8,p);
-                p.setStyle(Paint.Style.FILL);
-                if(t>0){} // The spotlight animation runs via periodic redraw.
+                if(game.introPage==0){
+                    panel(c,28,153,452,230,0xe51c1029,11);
+                    text(c,"WELCOME TO THE BALD MAN CLUB",240,177,20,GOLD,true);
+                    text(c,"An exclusive brotherhood of shiny gentlemen.",240,195,11,WHITE,true);
+                    text(c,"ONLY THE PERFECTLY BALD MAY ENTER.",240,216,13,MINT,true);
+                    button(c,"READ THE CLUB RULES","INTRO_NEXT",130,235,350,266,true);
+                }else{
+                    panel(c,29,54,451,231,0xf0180f28,12);
+                    text(c,"THE COUNCIL'S FOUR GOLDEN RULES",240,78,17,GOLD,true);
+                    text(c,"1. Only bald men may join the inner circle.",50,103,12,WHITE,false);
+                    text(c,"2. Every last strand must go.",50,126,12,WHITE,false);
+                    text(c,"3. A polished scalp is a badge of honour.",50,149,12,WHITE,false);
+                    text(c,"4. Combs are strictly forbidden.",50,172,12,WHITE,false);
+                    text(c,"No hair. No fear. No refunds on shampoo.",240,209,11,MINT,true);
+                    button(c,"BACK","INTRO_BACK",42,237,167,266,false);
+                    button(c,"ACCEPT & ENTER CLUB","ENTER",187,237,439,266,true);
+                }
             }else if(game.phase==GameState.TITLE){
                 panel(c,5,5,474,46,0xc7151029,8);
                 if(crest!=null){
@@ -133,15 +140,30 @@ public final class HudView extends View {
                 text(c,game.mode==GameState.ZEN?"ZEN / NO TIMER":"CHALLENGE / 90 SECONDS",26,159,10,WHITE,false);
                 text(c,"PERSONAL BEST: "+game.best,26,181,11,MINT,false);
                 panel(c,314,65,463,90,0xbb1a1030,8);
-                text(c,"PREVIEW APPLICANT",388,82,11,GOLD,true);
+                text(c,"BALD CANDIDATE",388,82,11,GOLD,true);
+                panel(c,303,170,467,204,0xd01c122d,7);
+                button(c,"ABOUT THE CLUB","RULES",310,174,461,200,false);
                 panel(c,13,207,467,222,0xe21b1331,5);
-                text(c,"DRAG TO SHAVE  •  TWO FINGERS TO TURN  •  HD GRAPHICS",240,218,10,WHITE,true);
+                text(c,"CLUB MOTTO:  "+game.motto(),240,218,10,WHITE,true);
                 button(c,"PREV","PREV",9,229,65,262,false);
                 button(c,"NEXT","NEXT",70,229,122,262,false);
                 button(c,game.mode==GameState.ZEN?"90 SEC":"ZEN","MODE",127,229,205,262,false);
                 button(c,game.sound?"MUSIC ON":"MUSIC OFF","SOUND",210,229,291,262,false);
                 button(c,game.highDetail?"HD ON":"HD OFF","HD",296,229,374,262,false);
                 button(c,"PLAY","PLAY",379,229,473,262,true);
+                if(game.aboutOpen){
+                    buttons.clear();
+                    panel(c,22,35,458,243,0xf6160e29,12);
+                    text(c,"THE BALD MAN CLUB",240,62,23,GOLD,true);
+                    text(c,"An invitation-only society for polished gentlemen.",240,82,11,WHITE,true);
+                    text(c,"MEMBERSHIP REQUIREMENTS",42,108,13,GOLD,false);
+                    text(c,"• No visible hair. Absolutely no exceptions.",42,129,12,WHITE,false);
+                    text(c,"• Our barbers inspect every follicle.",42,148,12,WHITE,false);
+                    text(c,"• Baldness is not a loss. It is an upgrade.",42,167,12,WHITE,false);
+                    text(c,"• The council demands a dazzling dome.",42,186,12,WHITE,false);
+                    text(c,"NOTICE: Unauthorized combs will be confiscated.",240,216,11,MINT,true);
+                    button(c,"BACK TO APPLICANTS","RULES",126,236,354,267,true);
+                }
             }else if(game.phase==GameState.PLAY){
                 panel(c,6,6,474,42,0xd0140e29,9);
                 text(c,"THE ELITE BALD MAN CLUB",17,25,15,GOLD,false);
@@ -180,9 +202,10 @@ public final class HudView extends View {
             }else if(game.phase==GameState.WIN){
                 art(c,victoryArt);
                 sparkles(c);
-                panel(c,102,174,380,226,0xd9151029,10);
-                text(c,"YOUR CLUB RECORD",241,191,10,GOLD,true);
-                text(c,"SCORE "+game.score+"   BEST "+game.best,241,210,16,WHITE,true);
+                panel(c,49,159,431,228,0xe7151029,10);
+                text(c,"MEMBERSHIP GRANTED",240,175,13,GOLD,true);
+                text(c,game.resultLine(),240,195,11,WHITE,true);
+                text(c,"SCORE "+game.score+"   BEST "+game.best,240,216,15,MINT,true);
                 button(c,"RETRY","PLAY",45,232,162,265,false);
                 button(c,"NEXT APPLICANT","NEXTPLAY",171,232,309,265,true);
                 button(c,"CLUB MENU","MENU",319,232,451,265,false);
@@ -190,8 +213,9 @@ public final class HudView extends View {
                 art(c,victoryArt);
                 panel(c,93,63,387,213,0xf0190e28,12);
                 text(c,"MEMBERSHIP DENIED",240,102,23,GOLD,true);
-                text(c,"THE CLOCK HAS RUN OUT",240,133,13,WHITE,true);
-                text(c,"SHAVED "+game.percentage()+"%  •  SCORE "+game.score,240,168,16,MINT,true);
+                text(c,"THE CLOCK HAS RUN OUT",240,128,13,WHITE,true);
+                text(c,"SHAVED "+game.percentage()+"%  •  SCORE "+game.score,240,156,16,MINT,true);
+                text(c,game.resultLine(),240,185,12,GOLD,true);
                 button(c,"RETRY","PLAY",70,229,224,263,true);
                 button(c,"CLUB MENU","MENU",254,229,409,263,false);
             }
@@ -205,6 +229,9 @@ public final class HudView extends View {
     }
     private void click(String action){
         switch(action){
+            case "INTRO_NEXT":game.nextIntro();break;
+            case "INTRO_BACK":game.prevIntro();break;
+            case "RULES":game.toggleAbout();break;
             case "ENTER":game.enterClub();break;
             case "PREV":game.select(game.candidate-1);break;
             case "NEXT":game.select(game.candidate+1);break;
@@ -235,7 +262,7 @@ public final class HudView extends View {
                     handledButton=true;click(b.action);return true;
                 }
                 if(game.phase==GameState.INTRO){
-                    game.enterClub();handledButton=true;return true;
+                    game.nextIntro();handledButton=true;return true;
                 }
                 if(game.phase==GameState.PLAY&&!game.paused){
                     game.beginShave(e.getX(),e.getY());
