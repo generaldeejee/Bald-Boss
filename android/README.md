@@ -1,4 +1,4 @@
-# Bald Elite — native Android edition (v1.1)
+# Bald Elite — native Android edition (v1.2, PSP audio + launcher icon)
 
 **Real Android APK, not an emulator.** Original OpenGL ES 2.0 3D renderer with a procedural, textured head and multiple haircuts. Uses the Bald Elite/3DS gameplay loop, rewritten in Java for Android devices.
 
@@ -22,3 +22,17 @@ The repository workflow `Build Bald Elite Android` builds and uploads the APK au
 GPU-rendered 3D, 256px procedural face texture, batched colored hair, z-buffer, and responsive full-screen Android HUD. Only removed hair segments are updated. The Android version is independent from PSP and 3DS and does not overwrite those projects.
 
 This is an initial Android port; the real-world GPU/FPS and device-specific touch feel require testing on hardware.
+
+
+## v1.2: original PSP audio
+
+The app ships all three original sounds directly from the PSP game:
+- Title/result music: original generated Deep Voice vocal song (PCM8, 11,025 Hz).
+- Gameplay: corresponding original instrumental mix (PCM8, 11,025 Hz).
+- Victory: actual Piper synthesised PSP announcement, "Another bald boss!" (PCM8, 22,050 Hz).
+
+Android's audio mixer also recreates the PSP clipper motor, contact/cut SFX and automatic music ducking. MUSIC ON/OFF only affects the soundtrack; clippers and announcer still play.
+
+Launcher icons are generated at 5 densities using the project's original custom Bald Elite design and Pillow. The app does not load assets from the internet.
+
+**Building:** GitHub Actions downloads the existing verified PSP audio generation artifact from run 39478827781. The artifact is subject to GitHub's retention period; once expired, rerun the PSP audio generation workflow and update the run-id in `.github/workflows/build-android.yml`. For offline development, provide those headers yourself and run `python3 android/tools/prepare_assets.py --music-header <path> --voice-header <path>` prior to Gradle.
