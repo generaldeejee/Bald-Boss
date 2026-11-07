@@ -44,7 +44,7 @@ public final class MainActivity extends Activity {
         root.addView(gl,new FrameLayout.LayoutParams(-1,-1));
         root.addView(new HudView(this,game),new FrameLayout.LayoutParams(-1,-1));
         setContentView(root);
-        sound=new SoundEngine(game);
+        sound=new SoundEngine(game,this);
         sound.start();
     }
     @Override protected void onResume(){
