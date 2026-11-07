@@ -28,7 +28,7 @@ public final class GameRenderer implements GLSurfaceView.Renderer {
     private final GameState game;
     private final Context context;
     private int surfaceWidth=960,surfaceHeight=540;
-    private int faceProgram,hairProgram,backgroundProgram,faceTexture,backgroundTexture;
+    private int faceProgram,hairProgram,backgroundProgram,faceTexture,backgroundTexture,detailTexture;
     private FloatBuffer faceVertices,hairVertices,backgroundVertices;
     private int faceCount=0,hairCount=0,lastCandidate=-1,lastSkinCandidate=-1;
     private boolean lastQuality=false;
@@ -44,11 +44,14 @@ public final class GameRenderer implements GLSurfaceView.Renderer {
         "vNormal=n;vUV=aUV;gl_Position=uMVP*vec4(aPosition,1.0);}";
     private static final String FACE_FRAG=
         "precision mediump float;varying vec2 vUV;varying float vLight;varying vec3 vNormal;"+
-        "uniform sampler2D uTex;uniform vec3 uTint;"+
-        "void main(){vec3 n=normalize(vNormal);vec3 key=normalize(vec3(-0.50,0.72,0.86));"+
+        "uniform sampler2D uTex;uniform sampler2D uDetail;uniform vec3 uTint;"+
+        "void main(){vec3 detail=texture2D(uDetail,vUV).rgb;"+
+        "vec3 n=normalize(vNormal+vec3((detail.r-.5)*.095,(detail.g-.5)*.095,0.0));"+
+        "vec3 key=normalize(vec3(-0.50,0.72,0.86));"+
         "vec3 r=reflect(-key,n);vec3 eye=normalize(vec3(0.0,0.12,1.0));"+
         "float crown=1.0-smoothstep(0.23,0.70,vUV.y);"+
-        "float shine=pow(max(dot(r,eye),0.0),mix(41.0,25.0,crown))*mix(0.15,0.46,crown);"+
+        "float smoothness=clamp(detail.b,0.05,0.98);"+
+        "float shine=pow(max(dot(r,eye),0.0),mix(58.0,18.0,smoothness))*mix(0.10,0.51,smoothness);"+
         "float bounce=max(dot(n,normalize(vec3(0.52,0.22,-0.74))),0.0)*0.05;"+
         "float rim=pow(1.0-max(dot(n,eye),0.0),3.0)*0.17;"+
         "vec3 base=texture2D(uTex,vUV).rgb*uTint;"+
@@ -101,7 +104,16 @@ public final class GameRenderer implements GLSurfaceView.Renderer {
         p.setShader(null);p.setColor(color);p.setStyle(Paint.Style.FILL);
         c.drawOval(new RectF(x-rx,y-ry,x+rx,y+ry),p);
     }
+    // Prefer the 2K physically textured, candidate-specific UV atlas.
+    // The earlier Canvas face is preserved as a standalone fallback when
+    // installed from a development APK without generated portrait assets.
     private Bitmap createFace(){
+        try(InputStream source=context.getAssets().open("skin_"+game.candidate+".jpg")){
+            android.graphics.BitmapFactory.Options options=new android.graphics.BitmapFactory.Options();
+            options.inSampleSize=game.highDetail?1:2;
+            Bitmap real=BitmapFactory.decodeStream(source,null,options);
+            if(real!=null)return real;
+        }catch(Exception ignored){}
         int resolution=game.highDetail?2048:1024;
         Bitmap b=Bitmap.createBitmap(resolution,resolution,Bitmap.Config.ARGB_8888);
         Canvas c=new Canvas(b);
@@ -178,6 +190,15 @@ public final class GameRenderer implements GLSurfaceView.Renderer {
         p.setStyle(Paint.Style.FILL);
         return b;
     }
+    private Bitmap createDetailTexture(){
+        try(InputStream source=context.getAssets().open("skin_detail.jpg")){
+            Bitmap image=BitmapFactory.decodeStream(source);
+            if(image!=null)return image;
+        }catch(Exception ignored){}
+        Bitmap fallback=Bitmap.createBitmap(16,16,Bitmap.Config.ARGB_8888);
+        fallback.eraseColor(0xff8080aa);
+        return fallback;
+    }
     private Bitmap createBackground(){
         try(InputStream stream=context.getAssets().open("club_menu.jpg")){
             Bitmap img=BitmapFactory.decodeStream(stream);
@@ -208,12 +229,26 @@ public final class GameRenderer implements GLSurfaceView.Renderer {
         faceVertex(y0,a0);faceVertex(y1,a1);faceVertex(y2,a2);
     }
     private void neckVertex(float y,float angle){
+        // Exact welded seam: first neck ring equals the final head ring
+        // sampled at y=-1.02 on exactly the SAME angular tessellation.
+        // A continuous Hermite-like blend rolls backward under the chin,
+        // becoming the realistic throat shape at the collar.
+        float top=-1.02f;
+        float t=Math.max(0f,Math.min(1f,(top-y)/.43f));
+        float eased=t*t*(3f-2f*t);
+        float[] topPoint=GameState.headPoint(top,angle);
         float sn=(float)Math.sin(angle),cs=(float)Math.cos(angle);
-        float r=.225f+(.04f*Math.max(0,(-y-1.1f)));
-        float x=r*sn,z=-.07f+.19f*cs;
+        float throatX=.24f*sn;
+        float throatZ=.09f+.175f*cs-.016f*(1f-cs*cs);
+        float x=topPoint[0]*(1f-eased)+throatX*eased;
+        float z=topPoint[2]*(1f-eased)+throatZ*eased;
+        float nx=sn,ny=-.365f+.13f*eased,nz=cs;
+        float norm=(float)(1.0/Math.sqrt(nx*nx+ny*ny+nz*nz));
         faceVertices.put(x).put(y).put(z);
-        faceVertices.put(.5f+sn*.05f).put(.89f);
-        faceVertices.put(sn).put(0).put(cs);
+        // Same u seam and exact same v=1 at the top neck/head join.
+        // The lower neck samples skin just above the jawline, not the eyes.
+        faceVertices.put(.5f+angle/(float)(2*Math.PI)).put(1f-.044f*eased);
+        faceVertices.put(nx*norm).put(ny*norm).put(nz*norm);
     }
     private void neckTri(float y0,float a0,float y1,float a1,float y2,float a2){
         neckVertex(y0,a0);neckVertex(y1,a1);neckVertex(y2,a2);
@@ -241,7 +276,7 @@ public final class GameRenderer implements GLSurfaceView.Renderer {
     }
     private void createHead(){
         final int rings=game.highDetail?110:64, slices=game.highDetail?160:96;
-        final int neckRings=10,neckSlices=game.highDetail?64:40;
+        final int neckRings=game.highDetail?15:10,neckSlices=slices;
         final int earRings=game.highDetail?13:8,earSlices=game.highDetail?32:20;
         faceCount=rings*slices*6+neckRings*neckSlices*6+4*earRings*earSlices*6;
         faceVertices=floats(faceCount*8);
@@ -254,11 +289,11 @@ public final class GameRenderer implements GLSurfaceView.Renderer {
             }
         }
         for(int i=0;i<neckRings;i++){
-            float y0=-1.01f-.37f*i/neckRings;
-            float y1=-1.01f-.37f*(i+1)/neckRings;
+            float y0=-1.02f-.43f*i/neckRings;
+            float y1=-1.02f-.43f*(i+1)/neckRings;
             for(int j=0;j<neckSlices;j++){
-                float a0=j/(float)neckSlices*(float)(2*Math.PI);
-                float a1=(j+1f)/neckSlices*(float)(2*Math.PI);
+                float a0=(j/(float)neckSlices-.5f)*(float)(2*Math.PI);
+                float a1=((j+1f)/neckSlices-.5f)*(float)(2*Math.PI);
                 neckTri(y0,a0,y1,a0,y0,a1);
                 neckTri(y0,a1,y1,a0,y1,a1);
             }
@@ -321,6 +356,7 @@ public final class GameRenderer implements GLSurfaceView.Renderer {
         hairProgram=program(HAIR_VERT,HAIR_FRAG);
         backgroundProgram=program(BG_VERT,BG_FRAG);
         faceTexture=texture(createFace());
+        detailTexture=texture(createDetailTexture());
         backgroundTexture=texture(createBackground());
         backgroundVertices=floats(16);
         // UV coordinates flipped for Android Bitmap's top-left origin.
@@ -394,6 +430,9 @@ public final class GameRenderer implements GLSurfaceView.Renderer {
             GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
             GLES20.glBindTexture(GLES20.GL_TEXTURE_2D,faceTexture);
             GLES20.glUniform1i(GLES20.glGetUniformLocation(faceProgram,"uTex"),0);
+            GLES20.glActiveTexture(GLES20.GL_TEXTURE1);
+            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D,detailTexture);
+            GLES20.glUniform1i(GLES20.glGetUniformLocation(faceProgram,"uDetail"),1);
             attrib(faceProgram,"aPosition",3,32,faceVertices,0);
             attrib(faceProgram,"aUV",2,32,faceVertices,3);
             attrib(faceProgram,"aNormal",3,32,faceVertices,5);
