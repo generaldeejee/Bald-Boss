@@ -39,9 +39,9 @@ public final class GameState {
         "That scalp is still on the waiting list.",
         "The club requires a smoother applicant."
     };
-    public String motto(){return CLUB_MOTTOS[Math.floorMod(candidate+uiSerial/3,CLUB_MOTTOS.length)];}
+    public String motto(){return CLUB_MOTTOS[((candidate+uiSerial/3)%CLUB_MOTTOS.length+CLUB_MOTTOS.length)%CLUB_MOTTOS.length];}
     public String resultLine(){String[] lines=phase==WIN?VICTORY_LINES:FAIL_LINES;
-        return lines[Math.floorMod(candidate+total+score/1000,lines.length)];}
+        return lines[((candidate+total+score/1000)%lines.length+lines.length)%lines.length];}
     public float yaw=0, pitch=0, seconds=0, cursorX=-1, cursorY=-1;
     public int score=0, combo=0, removed=0, best=0, total=0, lastHits=0;
     // Increment-only event counters, sampled by the independent PSP audio thread.
