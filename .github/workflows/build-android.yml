@@ -76,7 +76,11 @@ jobs:
       - name: Generate photographic-style 2K skin and packed detail textures
         run: |
           python3 android/tools/make_face_textures.py
-          for i in 0 1 2; do test -s "android/app/src/main/assets/skin_${i}.jpg"; done
+          python3 android/tools/make_profile_scalp.py
+          for i in 0 1 2; do
+            test -s "android/app/src/main/assets/skin_${i}.jpg"
+            test -s "android/app/src/main/assets/scalp_${i}.jpg"
+          done
           test -s android/app/src/main/assets/skin_detail.jpg
       - name: Compile native Android application
         run: gradle -p android --no-daemon --stacktrace :app:assembleDebug
@@ -91,6 +95,7 @@ jobs:
           name: BaldElite-2.2-Skin-Atlases
           path: |
             android/app/src/main/assets/skin_0.jpg
+            android/app/src/main/assets/scalp_0.jpg
             android/app/src/main/assets/skin_detail.jpg
           if-no-files-found: error
       - name: Upload Android APK
