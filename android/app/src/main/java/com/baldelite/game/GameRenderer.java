@@ -28,37 +28,44 @@ public final class GameRenderer implements GLSurfaceView.Renderer {
     private final GameState game;
     private final Context context;
     private int surfaceWidth=960,surfaceHeight=540;
-    private int faceProgram,hairProgram,backgroundProgram,faceTexture,scalpTexture,backgroundTexture,detailTexture;
+    private int faceProgram,hairProgram,backgroundProgram,faceTexture,scalpTexture,earTexture,backgroundTexture,detailTexture;
     private FloatBuffer faceVertices,hairVertices,backgroundVertices;
     private int faceCount=0,hairCount=0,lastCandidate=-1,lastSkinCandidate=-1;
     private boolean lastQuality=false;
     private final float[] projection=new float[16],view=new float[16],model=new float[16],mv=new float[16],mvp=new float[16];
     private long lastTime=0;
     private static final String FACE_VERT=
-        "attribute vec3 aPosition;attribute vec2 aUV;attribute vec3 aNormal;"+
-        "uniform mat4 uMVP;uniform mat4 uModel;varying vec2 vUV;varying float vLight;varying vec3 vNormal;"+
+        "attribute vec3 aPosition;attribute vec2 aUV;attribute vec3 aNormal;attribute float aRegion;"+
+        "uniform mat4 uMVP;uniform mat4 uModel;varying vec2 vUV;varying float vLight;varying vec3 vNormal;varying float vRegion;"+
         "void main(){vec3 n=normalize((uModel*vec4(aNormal,0.0)).xyz);"+
         "vec3 key=normalize(vec3(-0.50,0.72,0.86));"+
         "vec3 fill=normalize(vec3(0.65,0.25,0.55));"+
         "vLight=0.40+0.42*max(dot(n,key),0.0)+0.19*max(dot(n,fill),0.0);"+
-        "vNormal=n;vUV=aUV;gl_Position=uMVP*vec4(aPosition,1.0);}";
+        "vNormal=n;vUV=aUV;vRegion=aRegion;gl_Position=uMVP*vec4(aPosition,1.0);}";
     private static final String FACE_FRAG=
-        "precision mediump float;varying vec2 vUV;varying float vLight;varying vec3 vNormal;"+
-        "uniform sampler2D uTex;uniform sampler2D uScalp;uniform sampler2D uDetail;uniform vec3 uTint;"+
+        "precision mediump float;varying vec2 vUV;varying float vLight;varying vec3 vNormal;varying float vRegion;"+
+        "uniform sampler2D uTex;uniform sampler2D uScalp;uniform sampler2D uEar;uniform sampler2D uDetail;uniform vec3 uTint;"+
         "void main(){vec3 detail=texture2D(uDetail,vUV).rgb;"+
         "vec3 n=normalize(vNormal+vec3((detail.r-.5)*.095,(detail.g-.5)*.095,0.0));"+
         "vec3 key=normalize(vec3(-0.50,0.72,0.86));"+
         "vec3 r=reflect(-key,n);vec3 eye=normalize(vec3(0.0,0.12,1.0));"+
         "float crown=1.0-smoothstep(0.23,0.70,vUV.y);"+
         "float smoothness=clamp(detail.b,0.05,0.98);"+
+        "float materialRegion=step(0.5,vRegion);"+
+        "smoothness*=1.0-0.48*materialRegion;"+
         "float shine=pow(max(dot(r,eye),0.0),mix(58.0,18.0,smoothness))*mix(0.10,0.51,smoothness);"+
         "float bounce=max(dot(n,normalize(vec3(0.52,0.22,-0.74))),0.0)*0.05;"+
         "float rim=pow(1.0-max(dot(n,eye),0.0),3.0)*0.17;"+
-        "float faceMask=1.0-smoothstep(0.125,0.245,abs(vUV.x-0.5));"+
-        "faceMask*=1.0-smoothstep(0.87,0.99,vUV.y);"+
+        "float front=1.0-smoothstep(0.085,0.170,abs(vUV.x-0.5));"+
+        "front*=1.0-smoothstep(0.83,0.98,vUV.y);"+
+        "float earRegion=step(1.5,vRegion);"+
+        "float neckRegion=step(0.5,vRegion)*(1.0-earRegion);"+
+        "front*=1.0-earRegion;front*=1.0-neckRegion;"+
         "vec3 face=texture2D(uTex,vUV).rgb;"+
         "vec3 scalp=texture2D(uScalp,vUV).rgb;"+
-        "vec3 base=mix(scalp,face,faceMask)*uTint;"+
+        "vec3 earSkin=texture2D(uEar,vUV).rgb;"+
+        "vec3 base=mix(mix(scalp,face,front),earSkin,earRegion)*uTint;"+
+        
         "vec3 result=base*(vLight+bounce)+vec3(1.0,0.87,0.67)*shine+vec3(0.42,0.26,0.66)*rim;"+
         "gl_FragColor=vec4(clamp(result,0.0,1.0),1.0);}";
     private static final String HAIR_VERT=
@@ -207,6 +214,15 @@ public final class GameRenderer implements GLSurfaceView.Renderer {
         fallback.eraseColor(color);
         return fallback;
     }
+    private Bitmap createEar(){
+        try(InputStream src=context.getAssets().open("ear_"+game.candidate+".jpg")){
+            Bitmap result=BitmapFactory.decodeStream(src);
+            if(result!=null)return result;
+        }catch(Exception ignored){}
+        Bitmap fallback=Bitmap.createBitmap(16,16,Bitmap.Config.ARGB_8888);
+        fallback.eraseColor(0xffca987c);
+        return fallback;
+    }
     private Bitmap createDetailTexture(){
         try(InputStream source=context.getAssets().open("skin_detail.jpg")){
             Bitmap image=BitmapFactory.decodeStream(source);
@@ -240,7 +256,7 @@ public final class GameRenderer implements GLSurfaceView.Renderer {
         float inv=(float)(1/Math.sqrt(nx*nx+ny*ny+nz*nz));
         faceVertices.put(pt[0]).put(pt[1]).put(pt[2]);
         faceVertices.put((angle/(float)(2*Math.PI))+.5f).put((1.14f-y)/2.16f);
-        faceVertices.put(nx*inv).put(ny*inv).put(nz*inv);
+        faceVertices.put(nx*inv).put(ny*inv).put(nz*inv).put(0f);
     }
     private void tri(float y0,float a0,float y1,float a1,float y2,float a2){
         faceVertex(y0,a0);faceVertex(y1,a1);faceVertex(y2,a2);
@@ -265,7 +281,7 @@ public final class GameRenderer implements GLSurfaceView.Renderer {
         // Same u seam and exact same v=1 at the top neck/head join.
         // The lower neck samples skin just above the jawline, not the eyes.
         faceVertices.put(.5f+angle/(float)(2*Math.PI)).put(1f-.044f*eased);
-        faceVertices.put(nx*norm).put(ny*norm).put(nz*norm);
+        faceVertices.put(nx*norm).put(ny*norm).put(nz*norm).put(1f);
     }
     private void neckTri(float y0,float a0,float y1,float a1,float y2,float a2){
         neckVertex(y0,a0);neckVertex(y1,a1);neckVertex(y2,a2);
@@ -273,18 +289,24 @@ public final class GameRenderer implements GLSurfaceView.Renderer {
     // Anatomical ear shell is a thin curved mesh rather than a painted oval.
     // Both sides and front/back shells are visible when the head rotates.
     private void earVertex(int side,float radius,float theta,boolean rear){
-        float ca=(float)Math.cos(theta),sa=(float)Math.sin(theta);
-        float x=side*(.678f+.118f*radius*ca);
-        float y=-.108f+.212f*radius*sa;
-        float cartilage=.058f*(float)Math.exp(-Math.pow((radius-.56f)/.22f,2));
-        float z=-.042f+.064f*(1f-radius*radius)+cartilage;
-        z+=.010f*radius*(float)Math.cos(theta*3f);
-        if(rear)z-=.095f*(1f-radius*radius)+.022f;
-        float nx=side*.27f*radius*ca,ny=.20f*radius*sa,nz=rear?-1f:1f;
-        float inv=(float)(1/Math.sqrt(nx*nx+ny*ny+nz*nz));
+        // Curved ear shell in the Y-Z plane. Root follows the real cranial
+        // anatomy instead of an arbitrary x=.678 flat pancake.
+        float[] socket=GameState.headPoint(-.12f,side*1.48f);
+        float c=(float)Math.cos(theta),si=(float)Math.sin(theta);
+        float shell=(float)Math.exp(-Math.pow((radius-.82f)/.16f,2));
+        float concha=(float)Math.exp(-Math.pow((radius-.28f)/.26f,2));
+        float x=socket[0]+side*(.044f+.041f*shell-.037f*concha);
+        float y=-.11f+.192f*radius*si;
+        float z=socket[2]+.118f*radius*c-.014f;
+        // The central concha is a genuine inward surface depression.
+        if(rear){x-=side*.042f;z-=.013f;}
+        float nx=side*(.78f-.16f*radius),ny=.34f*radius*si,nz=.34f*radius*c;
+        if(rear)nx=-nx;
+        float inv=(float)(1.0/Math.sqrt(nx*nx+ny*ny+nz*nz));
         faceVertices.put(x).put(y).put(z);
-        faceVertices.put(.5f+side*.225f+radius*ca*.022f).put(.54f-radius*sa*.075f);
-        faceVertices.put(nx*inv).put(ny*inv).put(nz*inv);
+        // Independent UV island for ear cartilage / helix / ear canal.
+        faceVertices.put(.5f+.45f*radius*c).put(.5f+.45f*radius*si);
+        faceVertices.put(nx*inv).put(ny*inv).put(nz*inv).put(2f);
     }
     private void earTri(int side,boolean rear,
                         float r0,float a0,float r1,float a1,float r2,float a2){
@@ -296,7 +318,7 @@ public final class GameRenderer implements GLSurfaceView.Renderer {
         final int neckRings=game.highDetail?15:10,neckSlices=slices;
         final int earRings=game.highDetail?13:8,earSlices=game.highDetail?32:20;
         faceCount=rings*slices*6+neckRings*neckSlices*6+4*earRings*earSlices*6;
-        faceVertices=floats(faceCount*8);
+        faceVertices=floats(faceCount*9);
         for(int i=0;i<rings;i++){
             float y0=1.14f-2.16f*i/rings,y1=1.14f-2.16f*(i+1)/rings;
             for(int j=0;j<slices;j++){
@@ -419,6 +441,7 @@ public final class GameRenderer implements GLSurfaceView.Renderer {
         backgroundProgram=program(BG_VERT,BG_FRAG);
         faceTexture=texture(createFace());
         scalpTexture=texture(createScalp());
+        earTexture=texture(createEar());
         detailTexture=texture(createDetailTexture());
         backgroundTexture=texture(createBackground());
         backgroundVertices=floats(16);
@@ -468,10 +491,11 @@ public final class GameRenderer implements GLSurfaceView.Renderer {
             game.update(dt);
             if(game.highDetail!=lastQuality||game.candidate!=lastSkinCandidate){
                 if(game.highDetail!=lastQuality)createHead();
-                int[] previous={faceTexture,scalpTexture};
-                GLES20.glDeleteTextures(2,previous,0);
+                int[] previous={faceTexture,scalpTexture,earTexture};
+                GLES20.glDeleteTextures(3,previous,0);
                 faceTexture=texture(createFace());
                 scalpTexture=texture(createScalp());
+                earTexture=texture(createEar());
                 lastQuality=game.highDetail;
                 lastSkinCandidate=game.candidate;
             }
@@ -500,11 +524,15 @@ public final class GameRenderer implements GLSurfaceView.Renderer {
             GLES20.glActiveTexture(GLES20.GL_TEXTURE2);
             GLES20.glBindTexture(GLES20.GL_TEXTURE_2D,scalpTexture);
             GLES20.glUniform1i(GLES20.glGetUniformLocation(faceProgram,"uScalp"),2);
-            attrib(faceProgram,"aPosition",3,32,faceVertices,0);
-            attrib(faceProgram,"aUV",2,32,faceVertices,3);
-            attrib(faceProgram,"aNormal",3,32,faceVertices,5);
+            GLES20.glActiveTexture(GLES20.GL_TEXTURE3);
+            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D,earTexture);
+            GLES20.glUniform1i(GLES20.glGetUniformLocation(faceProgram,"uEar"),3);
+            attrib(faceProgram,"aPosition",3,36,faceVertices,0);
+            attrib(faceProgram,"aUV",2,36,faceVertices,3);
+            attrib(faceProgram,"aNormal",3,36,faceVertices,5);
+            attrib(faceProgram,"aRegion",1,36,faceVertices,8);
             GLES20.glDrawArrays(GLES20.GL_TRIANGLES,0,faceCount);
-            unattrib(faceProgram,"aPosition","aUV","aNormal");
+            unattrib(faceProgram,"aPosition","aUV","aNormal","aRegion");
             if(hairCount>0){
                 GLES20.glUseProgram(hairProgram);
                 GLES20.glUniformMatrix4fv(GLES20.glGetUniformLocation(hairProgram,"uMVP"),1,false,mvp,0);
