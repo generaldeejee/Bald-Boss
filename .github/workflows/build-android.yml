@@ -52,6 +52,27 @@ jobs:
           test -s android/app/src/main/assets/psp_game_instrumental.pcm
           test -s android/app/src/main/assets/psp_victory_voice.pcm
           test -s android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+      - name: Render original Bald Elite stereo 44.1 kHz score
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg espeak libsndfile1
+          python3 -m pip install --quiet --user numpy scipy soundfile pillow piper-tts==1.3.0 praat-parselmouth==0.4.7
+          python3 tools/music_sources/make_bald_boss_deep_voice.py
+          mkdir -p android/app/src/main/assets
+          ffmpeg -y -loglevel error -i tools/music_sources/Bald_Boss_80s_Deep_Voice.wav \
+            -c:a libvorbis -q:a 7 android/app/src/main/assets/psp_title_hq.ogg
+          ffmpeg -y -loglevel error -i tools/music_sources/Bald_Boss_80s_Deep_Instrumental.wav \
+            -c:a libvorbis -q:a 7 android/app/src/main/assets/psp_game_hq.ogg
+          ffprobe -v error -show_entries stream=sample_rate,channels -of default=nw=1 \
+            android/app/src/main/assets/psp_title_hq.ogg
+          test -s android/app/src/main/assets/psp_game_hq.ogg
+      - name: Prepare Deluxe club intro, menu and victory artwork
+        run: |
+          python3 android/tools/make_deluxe_art.py
+          test -s android/app/src/main/assets/club_intro.jpg
+          test -s android/app/src/main/assets/club_menu.jpg
+          test -s android/app/src/main/assets/club_victory.jpg
+          test -s android/app/src/main/assets/club_crest.png
       - name: Compile native Android application
         run: gradle -p android --no-daemon --stacktrace :app:assembleDebug
       - name: Verify installable APK
