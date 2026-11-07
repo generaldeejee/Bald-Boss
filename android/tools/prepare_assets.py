@@ -99,6 +99,14 @@ def generate_icon():
         dest=APP/"res"/("mipmap-"+density)
         dest.mkdir(parents=True,exist_ok=True)
         icon.resize((scale,scale),Image.Resampling.LANCZOS).save(dest/"ic_launcher.png",optimize=True)
+    # Distinct release icon badge, so a phone with 2.0-2.5 installed
+    # cannot silently open an older application by mistake.
+    badgefont=font(37)
+    d.rounded_rectangle((455,48,599,114),radius=17,fill=(22,101,96,255),outline=(248,219,139,255),width=5)
+    d.text((470,56),"V2.6",font=badgefont,fill=(255,255,239,255),stroke_width=1,stroke_fill=(3,32,42,255))
+    for density,scale in [("mdpi",48),("hdpi",72),("xhdpi",96),("xxhdpi",144),("xxxhdpi",192)]:
+        dest=APP/"res"/("mipmap-"+density)
+        icon.resize((scale,scale),Image.Resampling.LANCZOS).save(dest/"ic_launcher.png",optimize=True)
     # Full-resolution source is also packaged for sharing/previews.
     folder=ROOT/"android"/"generated"
     folder.mkdir(parents=True,exist_ok=True)
