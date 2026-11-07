@@ -49,6 +49,18 @@ public final class HudView extends View {
             return BitmapFactory.decodeStream(input);
         }catch(Exception ignored){return null;}
     }
+    // Match controls to any handset aspect ratio without horizontally
+    // stretching fonts or clipping "1250 HAIRS" on extra-wide screens.
+    private float uiScale(){return Math.min(getWidth()/480f,getHeight()/270f);}
+    private float uiX(){return (getWidth()-480f*uiScale())*.5f;}
+    private float uiY(){return (getHeight()-270f*uiScale())*.5f;}
+    private void textRight(Canvas c,String msg,float x,float y,float size,int tint){
+        color(tint);
+        p.setTextSize(size);
+        p.setTypeface(android.graphics.Typeface.create("sans-serif-medium",android.graphics.Typeface.NORMAL));
+        p.setTextAlign(Paint.Align.RIGHT);
+        c.drawText(msg,x,y,p);
+    }
     private void color(int col){
         p.setColor(col);p.setStyle(Paint.Style.FILL);p.setShader(null);
     }
@@ -103,7 +115,8 @@ public final class HudView extends View {
     @Override protected void onDraw(Canvas c){
         super.onDraw(c);
         c.save();
-        c.scale(getWidth()/480f,getHeight()/270f);
+        c.translate(uiX(),uiY());
+        c.scale(uiScale(),uiScale());
         buttons.clear();
         synchronized(game){
             if(game.phase==GameState.INTRO){
@@ -170,9 +183,9 @@ public final class HudView extends View {
                 panel(c,4,3,476,31,0xb10b1322,6);
                 text(c,(game.mode==GameState.ZEN?"ZEN ":"TIME ")+format(game.timeLeft()),
                      12,21,13,GOLD,false);
-                text(c,"SCORE "+game.score+"  /  x"+game.combo,170,21,12,WHITE,true);
-                text(c,game.percentage()+"%  •  "+(game.hairs.length-game.removed)+" HAIRS",
-                     463,21,12,MINT,true);
+                text(c,"SCORE "+game.score+"  /  x"+game.combo,236,21,11.5f,WHITE,true);
+                textRight(c,game.percentage()+"%  •  "+(game.hairs.length-game.removed)+" HAIRS",
+                          466,21,11.5f,MINT);
                 // Five-pixel gold and mint progress track, not a floating panel.
                 float fraction=(float)game.removed/Math.max(1,game.hairs.length);
                 panel(c,12,34,468,38,0x99535b6c,2);
@@ -183,8 +196,8 @@ public final class HudView extends View {
                     text(c,"SESSION PAUSED",240,137,20,GOLD,true);
                     text(c,"TAP RESUME TO CONTINUE",240,157,11,WHITE,true);
                 }else if(game.cursorX>=0){
-                    float x=game.cursorX*480f/Math.max(1,getWidth());
-                    float y=game.cursorY*270f/Math.max(1,getHeight());
+                    float x=(game.cursorX-uiX())/uiScale();
+                    float y=(game.cursorY-uiY())/uiScale();
                     color(GOLD);
                     p.setStyle(Paint.Style.STROKE);
                     p.setStrokeWidth(1.5f);
@@ -257,10 +270,12 @@ public final class HudView extends View {
     }
     @Override public boolean onTouchEvent(MotionEvent e){
         int action=e.getActionMasked();
-        float sx=480f/Math.max(1,getWidth()),sy=270f/Math.max(1,getHeight());
+        float scale=uiScale();
+        float offsetX=uiX(),offsetY=uiY();
         if(action==MotionEvent.ACTION_DOWN){
             handledButton=false;orbit=false;
-            float x=e.getX()*sx,y=e.getY()*sy;
+            float x=(e.getX()-offsetX)/scale;
+            float y=(e.getY()-offsetY)/scale;
             synchronized(game){
                 for(Control b:buttons)if(b.area.contains(x,y)){
                     handledButton=true;click(b.action);return true;
