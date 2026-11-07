@@ -30,7 +30,7 @@ public final class GameRenderer implements GLSurfaceView.Renderer {
     private int surfaceWidth=960,surfaceHeight=540;
     private int faceProgram,hairProgram,backgroundProgram,faceTexture,backgroundTexture;
     private FloatBuffer faceVertices,hairVertices,backgroundVertices;
-    private int faceCount=0,hairCount=0,lastCandidate=-1;
+    private int faceCount=0,hairCount=0,lastCandidate=-1,lastSkinCandidate=-1;
     private boolean lastQuality=false;
     private final float[] projection=new float[16],view=new float[16],model=new float[16],mv=new float[16],mvp=new float[16];
     private long lastTime=0;
@@ -47,10 +47,12 @@ public final class GameRenderer implements GLSurfaceView.Renderer {
         "uniform sampler2D uTex;uniform vec3 uTint;"+
         "void main(){vec3 n=normalize(vNormal);vec3 key=normalize(vec3(-0.50,0.72,0.86));"+
         "vec3 r=reflect(-key,n);vec3 eye=normalize(vec3(0.0,0.12,1.0));"+
-        "float shine=pow(max(dot(r,eye),0.0),28.0)*0.30;"+
+        "float crown=1.0-smoothstep(0.23,0.70,vUV.y);"+
+        "float shine=pow(max(dot(r,eye),0.0),mix(41.0,25.0,crown))*mix(0.15,0.46,crown);"+
+        "float bounce=max(dot(n,normalize(vec3(0.52,0.22,-0.74))),0.0)*0.05;"+
         "float rim=pow(1.0-max(dot(n,eye),0.0),3.0)*0.17;"+
         "vec3 base=texture2D(uTex,vUV).rgb*uTint;"+
-        "vec3 result=base*vLight+vec3(1.0,0.82,0.56)*shine+vec3(0.40,0.25,0.70)*rim;"+
+        "vec3 result=base*(vLight+bounce)+vec3(1.0,0.87,0.67)*shine+vec3(0.42,0.26,0.66)*rim;"+
         "gl_FragColor=vec4(clamp(result,0.0,1.0),1.0);}";
     private static final String HAIR_VERT=
         "attribute vec3 aPosition;attribute vec3 aColor;uniform mat4 uMVP;varying vec3 vColor;"+
@@ -100,7 +102,7 @@ public final class GameRenderer implements GLSurfaceView.Renderer {
         c.drawOval(new RectF(x-rx,y-ry,x+rx,y+ry),p);
     }
     private Bitmap createFace(){
-        int resolution=game.highDetail?1024:512;
+        int resolution=game.highDetail?2048:1024;
         Bitmap b=Bitmap.createBitmap(resolution,resolution,Bitmap.Config.ARGB_8888);
         Canvas c=new Canvas(b);
         c.scale(resolution/256f,resolution/256f);
@@ -140,15 +142,35 @@ public final class GameRenderer implements GLSurfaceView.Renderer {
         oval(c,p,128,194,17,5,0xffca9382);
         oval(c,p,128,192.5f,15,1.0f,0xff78483f);
         oval(c,p,128,221,19,4,0x23734432);
-        // Pores and freckles are deterministic, subtle and zoom-safe.
-        Random rand=new Random(0xB01D2026L);
-        for(int k=0;k<(game.highDetail?1400:550);k++){
+        // Individual applicant facial details: professors have slight crow's-feet,
+        // punk has a tiny eyebrow scar, businessman has a smoother clean shave.
+        if(game.candidate==2){
+            p.setShader(null);p.setStyle(Paint.Style.STROKE);
+            p.setStrokeWidth(.56f);p.setColor(0x60865d50);
+            for(int side:new int[]{-1,1}){
+                int x=128+side*31;
+                for(int offset=0;offset<3;offset++){
+                    c.drawArc(new RectF(x-8,119+offset*5,x+8,131+offset*5),
+                              side>0?290:120,55,false,p);
+                }
+            }
+            p.setStyle(Paint.Style.FILL);
+            oval(c,p,128,74,26,1.2f,0x26874c3f);
+        }else if(game.candidate==1){
+            p.setShader(null);p.setStyle(Paint.Style.STROKE);
+            p.setStrokeWidth(1.1f);p.setColor(0xffb67f69);
+            c.drawLine(147,91,152,104,p);
+            p.setStyle(Paint.Style.FILL);
+        }
+        // Deterministic pores, fine freckles and subtle complexion variation.
+        Random rand=new Random(0xB01D2026L+game.candidate*97L);
+        for(int k=0;k<(game.highDetail?5200:1800);k++){
             float x=45+rand.nextFloat()*166;
             float y=39+rand.nextFloat()*209;
             int a=(k%7==0)?24:11;
             int tint=(a<<24)|(76<<16)|(45<<8)|34;
             p.setColor(tint);
-            c.drawCircle(x,y,(k%11==0?.23f:.13f),p);
+            c.drawCircle(x,y,(k%11==0?.21f:.10f),p);
         }
         // Very fine sheen on the scalp, rendered as texture detail and GPU light.
         p.setColor(0x29fff1d3);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(.45f);
@@ -196,10 +218,32 @@ public final class GameRenderer implements GLSurfaceView.Renderer {
     private void neckTri(float y0,float a0,float y1,float a1,float y2,float a2){
         neckVertex(y0,a0);neckVertex(y1,a1);neckVertex(y2,a2);
     }
+    // Anatomical ear shell is a thin curved mesh rather than a painted oval.
+    // Both sides and front/back shells are visible when the head rotates.
+    private void earVertex(int side,float radius,float theta,boolean rear){
+        float ca=(float)Math.cos(theta),sa=(float)Math.sin(theta);
+        float x=side*(.678f+.118f*radius*ca);
+        float y=-.108f+.212f*radius*sa;
+        float cartilage=.058f*(float)Math.exp(-Math.pow((radius-.56f)/.22f,2));
+        float z=-.042f+.064f*(1f-radius*radius)+cartilage;
+        z+=.010f*radius*(float)Math.cos(theta*3f);
+        if(rear)z-=.095f*(1f-radius*radius)+.022f;
+        float nx=side*.27f*radius*ca,ny=.20f*radius*sa,nz=rear?-1f:1f;
+        float inv=(float)(1/Math.sqrt(nx*nx+ny*ny+nz*nz));
+        faceVertices.put(x).put(y).put(z);
+        faceVertices.put(.5f+side*.225f+radius*ca*.022f).put(.54f-radius*sa*.075f);
+        faceVertices.put(nx*inv).put(ny*inv).put(nz*inv);
+    }
+    private void earTri(int side,boolean rear,
+                        float r0,float a0,float r1,float a1,float r2,float a2){
+        earVertex(side,r0,a0,rear);earVertex(side,r1,a1,rear);
+        earVertex(side,r2,a2,rear);
+    }
     private void createHead(){
-        final int rings=game.highDetail?86:48, slices=game.highDetail?120:72;
-        final int neckRings=8,neckSlices=game.highDetail?48:32;
-        faceCount=rings*slices*6+neckRings*neckSlices*6;
+        final int rings=game.highDetail?110:64, slices=game.highDetail?160:96;
+        final int neckRings=10,neckSlices=game.highDetail?64:40;
+        final int earRings=game.highDetail?13:8,earSlices=game.highDetail?32:20;
+        faceCount=rings*slices*6+neckRings*neckSlices*6+4*earRings*earSlices*6;
         faceVertices=floats(faceCount*8);
         for(int i=0;i<rings;i++){
             float y0=1.14f-2.16f*i/rings,y1=1.14f-2.16f*(i+1)/rings;
@@ -217,6 +261,20 @@ public final class GameRenderer implements GLSurfaceView.Renderer {
                 float a1=(j+1f)/neckSlices*(float)(2*Math.PI);
                 neckTri(y0,a0,y1,a0,y0,a1);
                 neckTri(y0,a1,y1,a0,y1,a1);
+            }
+        }
+        for(int side:new int[]{-1,1}){
+            for(int surface=0;surface<2;surface++){
+                boolean rear=surface==1;
+                for(int ring=0;ring<earRings;ring++){
+                    float r0=ring/(float)earRings,r1=(ring+1f)/earRings;
+                    for(int wedge=0;wedge<earSlices;wedge++){
+                        float a0=wedge/(float)earSlices*(float)(2*Math.PI);
+                        float a1=(wedge+1f)/earSlices*(float)(2*Math.PI);
+                        earTri(side,rear,r0,a0,r1,a0,r0,a1);
+                        earTri(side,rear,r0,a1,r1,a0,r1,a1);
+                    }
+                }
             }
         }
         faceVertices.position(0);
@@ -269,7 +327,7 @@ public final class GameRenderer implements GLSurfaceView.Renderer {
         backgroundVertices.put(new float[]{-1,-1,0,1, 1,-1,1,1, -1,1,0,0, 1,1,1,0});
         backgroundVertices.position(0);
         createHead();
-        synchronized(game){game.hairDirty=true;lastQuality=game.highDetail;}
+        synchronized(game){game.hairDirty=true;lastQuality=game.highDetail;lastSkinCandidate=game.candidate;}
         lastTime=System.nanoTime();
     }
     @Override public void onSurfaceChanged(GL10 unused,int w,int h){
@@ -309,12 +367,13 @@ public final class GameRenderer implements GLSurfaceView.Renderer {
         drawBackground();
         synchronized(game){
             game.update(dt);
-            if(game.highDetail!=lastQuality){
-                createHead();
+            if(game.highDetail!=lastQuality||game.candidate!=lastSkinCandidate){
+                if(game.highDetail!=lastQuality)createHead();
                 int[] previous={faceTexture};
                 GLES20.glDeleteTextures(1,previous,0);
                 faceTexture=texture(createFace());
                 lastQuality=game.highDetail;
+                lastSkinCandidate=game.candidate;
             }
             if(game.hairDirty||lastCandidate!=game.candidate){
                 updateHair();lastCandidate=game.candidate;
