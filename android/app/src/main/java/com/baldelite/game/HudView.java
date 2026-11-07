@@ -144,7 +144,8 @@ public final class HudView extends View {
                     color(0xffffffff);c.drawBitmap(crest,null,new RectF(10,2,60,50),p);
                 }
                 text(c,"BALD ELITE",65,25,20,GOLD,false);
-                text(c,"THE ELITE BALD MAN CLUB",66,39,9,WHITE,false);
+                textRight(c,"v2.6",464,24,13,MINT);
+                text(c,"V2.6 RESTORED • HEAD + HAIR + INSTRUMENTS",66,39,9,MINT,false);
                 panel(c,13,60,218,203,0xe6161029,9);
                 text(c,"CLUB INITIATION",26,81,14,GOLD,false);
                 text(c,"APPLICANT  "+(game.candidate+1)+"/3",26,103,13,WHITE,false);
@@ -178,11 +179,12 @@ public final class HudView extends View {
                     button(c,"BACK TO APPLICANTS","RULES",126,236,354,267,true);
                 }
             }else if(game.phase==GameState.PLAY){
-                // v2.3: total UI occlusion shrunk to 38px top and 29px bottom.
+                // v2.6 preserves the compact 38px top and 29px bottom HUD.
                 // The entire central game field is now exposed for grooming.
                 panel(c,4,3,476,31,0xb10b1322,6);
                 text(c,(game.mode==GameState.ZEN?"ZEN ":"TIME ")+format(game.timeLeft()),
                      12,21,13,GOLD,false);
+                text(c,"2.6",122,21,10,MINT,false);
                 text(c,"SCORE "+game.score+"  /  x"+game.combo,236,21,11.5f,WHITE,true);
                 textRight(c,game.percentage()+"%  •  "+(game.hairs.length-game.removed)+" HAIRS",
                           466,21,11.5f,MINT);
