@@ -195,3 +195,16 @@ sample-instrument arrangements**. There is no MIDI synthesizer on the phone.
   from 24 to 25; an update preserves records if signed with the same key.
   Debug CI APKs are automatically signed with ephemeral keys, so a release
   should use a persistent signing key to support in-place upgrades.
+
+
+## v2.6 — verified rebuild and unambiguous version label
+
+The v2.5 manifest accidentally still displayed "Bald Man Club v2.4", and
+several older installations used nearly identical launcher icons. This release
+preserves the complete v2.4 sculpted head, 3D ear materials, v2.3 curved hairs,
+compact aspect-ratio-safe HUD, all 3 HD portraits, premium club artwork, and
+v2.5 sample-instrument stereo music. It adds an unmistakable V2.6 icon, main
+menu version text, and gameplay version indicator. A clean application ID
+com.baldelite.club.rebuilt26 prevents accidentally replacing/launching an old
+installation with a stale signature. Old app installations and their saved
+records remain untouched; new app records are stored separately.
