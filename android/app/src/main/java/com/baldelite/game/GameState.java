@@ -13,6 +13,8 @@ public final class GameState {
     public boolean paused=false, sound=true;
     public float yaw=0, pitch=0, seconds=0, cursorX=-1, cursorY=-1;
     public int score=0, combo=0, removed=0, best=0, total=0, lastHits=0;
+    // Increment-only event counters, sampled by the independent PSP audio thread.
+    public int cutSerial=0, winSerial=0;
     public float comboTimer=0;
     public Hair[] hairs=new Hair[0];
     public boolean hairDirty=true;
@@ -76,6 +78,7 @@ public final class GameState {
     public void tilt(float diff){pitch=Math.max(-.72f,Math.min(.78f,pitch+diff));}
     public void changeZoom(){zoom=(zoom+1)%3;}
     private void win(){
+        winSerial++;
         phase=WIN;paused=false;stroke=false;total++;
         if(score>best){best=score;prefs.edit().putInt("best_"+candidate+"_"+mode,best).apply();}
     }
@@ -164,6 +167,7 @@ public final class GameState {
             h.gone=true;removed++;count++;
         }
         if(count>0){
+            cutSerial++;
             hairDirty=true;
             if(comboTimer>.5f)combo=0;
             combo=Math.min(100,combo+count);
@@ -183,7 +187,7 @@ public final class GameState {
         if(phase!=PLAY||hairs.length-removed>8)return;
         for(Hair h:hairs)if(!h.gone){
             turn((float)Math.atan2(h.nx,h.nz)-yaw);
-            h.gone=true;removed++;score+=20;hairDirty=true;
+            h.gone=true;removed++;score+=20;hairDirty=true;cutSerial++;
             if(removed==hairs.length)win();
             break;
         }
