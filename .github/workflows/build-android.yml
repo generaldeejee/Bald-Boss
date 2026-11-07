@@ -73,6 +73,11 @@ jobs:
           test -s android/app/src/main/assets/club_menu.jpg
           test -s android/app/src/main/assets/club_victory.jpg
           test -s android/app/src/main/assets/club_crest.png
+      - name: Generate photographic-style 2K skin and packed detail textures
+        run: |
+          python3 android/tools/make_face_textures.py
+          for i in 0 1 2; do test -s "android/app/src/main/assets/skin_${i}.jpg"; done
+          test -s android/app/src/main/assets/skin_detail.jpg
       - name: Compile native Android application
         run: gradle -p android --no-daemon --stacktrace :app:assembleDebug
       - name: Verify installable APK
@@ -80,9 +85,18 @@ jobs:
           test -s android/app/build/outputs/apk/debug/app-debug.apk
           ls -lh android/app/build/outputs/apk/debug/app-debug.apk
           unzip -t android/app/build/outputs/apk/debug/app-debug.apk | tail -1
+      - name: Upload sample skin textures for visual inspection
+        uses: actions/upload-artifact@v4
+        with:
+          name: BaldElite-2.2-Skin-Atlases
+          path: |
+            android/app/src/main/assets/skin_0.jpg
+            android/app/src/main/assets/skin_detail.jpg
+          if-no-files-found: error
       - name: Upload Android APK
         uses: actions/upload-artifact@v4
         with:
           name: BaldElite-Android-APK
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
