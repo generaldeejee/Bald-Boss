@@ -4,6 +4,8 @@ import android.app.Activity;
 import android.content.pm.ActivityInfo;
 import android.opengl.GLSurfaceView;
 import android.os.Bundle;
+import android.os.Build;
+import android.view.WindowManager;
 import android.view.View;
 import android.widget.FrameLayout;
 
@@ -12,6 +14,13 @@ public final class MainActivity extends Activity {
     private GLSurfaceView gl;
     private SoundEngine sound;
     private void immersive(){
+        // Newer Android versions always lay out immersive games edge to edge.
+        // Permit drawing in camera-cutout areas while keeping controls visible.
+        if(Build.VERSION.SDK_INT>=28){
+            WindowManager.LayoutParams attributes=getWindow().getAttributes();
+            attributes.layoutInDisplayCutoutMode=WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
+            getWindow().setAttributes(attributes);
+        }
         getWindow().getDecorView().setSystemUiVisibility(
             View.SYSTEM_UI_FLAG_FULLSCREEN|
             View.SYSTEM_UI_FLAG_HIDE_NAVIGATION|
