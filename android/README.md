@@ -170,3 +170,28 @@ The 2.4 application ID `com.baldelite.club.truehead` installs alongside
 2.3 without replacing its saves. Actual visual fidelity still requires
 photographs/screenshots from a physical Android device; successful CI does
 not prove the ear silhouette and every texture seam look realistic.
+
+
+## Bald Elite v2.5 — Instrument Band Soundtrack
+
+Based on player feedback that the old synthesizer music sounded like MIDI,
+the old 44.1 kHz tracks have been replaced with entirely new **offline,
+sample-instrument arrangements**. There is no MIDI synthesizer on the phone.
+
+- Menu: original club-lounge funk composition, **113 BPM**, approx 51 s.
+- Gameplay: original energetic funk-rock composition, **140 BPM**, approx 69 s.
+- Arrangement: sample-based fingered electric bass, clean and overdriven guitar,
+  acoustic steel-string guitar, acoustic drum-kit samples, Rhodes electric
+  piano, Hammond-style organ, saxo melody and short horn accents.
+- Humanized micro-timing, varied velocities, offbeat guitar chops and
+  room reflections make it sound less sequenced than v2.4.
+- 44,100 Hz, stereo, Ogg Vorbis quality 7.
+- **Not a live studio recording:** audio uses real-instrument *samples* from
+  the TimGM6mb SoundFont, GPL-2 (see Debian/Ubuntu soundfont package notices).
+  Source script: `android/tools/render_instrument_band.py`.
+- The spoken PSP victory announcement, clipper motor, shave sounds, menu
+  feedback, original art, and all gameplay mechanics remain unchanged.
+- v2.5 retains app ID `com.baldelite.club.truehead` and raises versionCode
+  from 24 to 25; an update preserves records if signed with the same key.
+  Debug CI APKs are automatically signed with ephemeral keys, so a release
+  should use a persistent signing key to support in-place upgrades.
