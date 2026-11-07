@@ -13,6 +13,7 @@ jobs:
     timeout-minutes: 25
     permissions:
       contents: read
+      actions: read
     steps:
       - uses: actions/checkout@v4
       - name: Use JDK 17 for Android Gradle Plugin
@@ -33,6 +34,24 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
+      - name: Retrieve original PSP music and announcer
+        uses: actions/download-artifact@v4
+        with:
+          name: BaldElite-PSP-Assets
+          repository: generaldeejee/Bald-Boss
+          run-id: 39478827781
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: .psp-assets
+      - name: Create Bald Elite launcher icon and preserve PSP audio
+        run: |
+          python3 -m pip install --user --quiet Pillow
+          python3 android/tools/prepare_assets.py \
+            --music-header .psp-assets/src/music_samples.h \
+            --voice-header .psp-assets/src/voice_sample.h
+          test -s android/app/src/main/assets/psp_title_vocals.pcm
+          test -s android/app/src/main/assets/psp_game_instrumental.pcm
+          test -s android/app/src/main/assets/psp_victory_voice.pcm
+          test -s android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
       - name: Compile native Android application
         run: gradle -p android --no-daemon --stacktrace :app:assembleDebug
       - name: Verify installable APK
