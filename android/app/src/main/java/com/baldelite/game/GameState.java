@@ -11,6 +11,37 @@ public final class GameState {
     private final SharedPreferences prefs;
     public int phase=TITLE, candidate=0, mode=CHALLENGE, zoom=0;
     public boolean paused=false, sound=true, highDetail=true;
+    public boolean aboutOpen=false;
+    public int introPage=0;
+    public static final String[] CLUB_MOTTOS={
+        "Hair today. Gone today.",
+        "Combs are contraband.",
+        "No hair. No fear.",
+        "Membership begins where hair ends.",
+        "The council is watching your scalp.",
+        "Baldness: the ultimate upgrade.",
+        "We do not negotiate with follicles.",
+        "Shampoo? We retired it in 1987."
+    };
+    public static final String[] VICTORY_LINES={
+        "The Council of Polished Scalps approves.",
+        "A flawless dome. A flawless gentleman.",
+        "Shiny. Smooth. Officially admitted.",
+        "Another proud bald man joins the club.",
+        "The club salutes your shaving excellence.",
+        "This scalp is inner-circle material."
+    };
+    public static final String[] FAIL_LINES={
+        "Too much hair. The council is not amused.",
+        "Unauthorized follicles detected.",
+        "A true member leaves no strand behind.",
+        "The entrance guard has a comb. Beware.",
+        "That scalp is still on the waiting list.",
+        "The club requires a smoother applicant."
+    };
+    public String motto(){return CLUB_MOTTOS[Math.floorMod(candidate+uiSerial/3,CLUB_MOTTOS.length)];}
+    public String resultLine(){String[] lines=phase==WIN?VICTORY_LINES:FAIL_LINES;
+        return lines[Math.floorMod(candidate+total+score/1000,lines.length)];}
     public float yaw=0, pitch=0, seconds=0, cursorX=-1, cursorY=-1;
     public int score=0, combo=0, removed=0, best=0, total=0, lastHits=0;
     // Increment-only event counters, sampled by the independent PSP audio thread.
@@ -34,10 +65,17 @@ public final class GameState {
         select(0);
         phase=INTRO;
     }
-    public void enterClub(){phase=TITLE;uiSerial++;}
+    public void nextIntro(){
+        if(introPage==0){introPage=1;uiSerial++;}
+        else enterClub();
+    }
+    public void prevIntro(){introPage=0;uiSerial++;}
+    public void enterClub(){phase=TITLE;aboutOpen=false;uiSerial++;}
+    public void toggleAbout(){aboutOpen=!aboutOpen;uiSerial++;}
     public void toggleQuality(){highDetail=!highDetail;prefs.edit().putBoolean("high_detail",highDetail).apply();uiSerial++;}
     public void select(int c){
         uiSerial++;
+        aboutOpen=false;
         candidate=(c+3)%3;
         yaw=pitch=0;zoom=0;paused=false;phase=TITLE;
         score=combo=removed=lastHits=0;seconds=0;stroke=false;bonus=false;
@@ -48,6 +86,7 @@ public final class GameState {
     public void toggleSound(){sound=!sound;prefs.edit().putBoolean("sound",sound).apply();uiSerial++;}
     public void start(){
         uiSerial++;
+        aboutOpen=false;
         phase=PLAY;paused=false;score=0;combo=0;removed=0;lastHits=0;seconds=0;
         yaw=pitch=0;zoom=0;stroke=false;comboTimer=0;bonus=false;
         regenerate();loadBest();
@@ -103,10 +142,26 @@ public final class GameState {
         float sa=(float)Math.sin(a),ca=(float)Math.cos(a);
         float x=interpolate(y,W)*sa;
         float z=interpolate(y,C)+interpolate(y,D)*ca;
+        // v2.1: true temporal, cheekbone, jawline and chin sculpting.
+        float cheek=gauss((y+.06f)/.23f);
+        float cheekSide=gauss((Math.abs(a)-.67f)/.32f);
+        x+=sa*.024f*cheek*cheekSide;
+        z+=.024f*cheek*cheekSide;
+        float jaw=gauss((y+.71f)/.24f);
+        float jawSide=gauss((Math.abs(a)-.91f)/.30f);
+        x+=sa*.035f*jaw*jawSide;
+        z-=.023f*jaw*jawSide;
+        float brow=gauss((y-.35f)/.11f);
+        z+=.023f*brow*gauss((Math.abs(a)-.43f)/.24f);
+        float chin=gauss((y+.91f)/.15f)*gauss(a/.48f);
+        z+=.055f*chin;
+        // Temple indentation behind brows.
+        z-=.018f*gauss((y-.33f)/.21f)*gauss((Math.abs(a)-1.16f)/.24f);
         float bridge=gauss(a/.20f)*gauss((y+.04f)/.29f);
         float tip=gauss(a/.16f)*gauss((y+.25f)/.12f);
         float wing=(gauss((a-.16f)/.085f)+gauss((a+.16f)/.085f))*gauss((y+.31f)/.09f);
-        z+=.078f*bridge+.168f*tip+.035f*wing;
+        z+=.095f*bridge+.187f*tip+.047f*wing;
+        z-=.012f*gauss(a/.12f)*gauss((y+.42f)/.08f);
         float eyes=gauss((a-.40f)/.18f)+gauss((a+.40f)/.18f);
         z-=.043f*eyes*gauss((y-.25f)/.125f);
         z+=.019f*eyes*gauss((y-.38f)/.09f);
