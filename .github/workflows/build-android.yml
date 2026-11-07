@@ -80,6 +80,7 @@ jobs:
           for i in 0 1 2; do
             test -s "android/app/src/main/assets/skin_${i}.jpg"
             test -s "android/app/src/main/assets/scalp_${i}.jpg"
+            test -s "android/app/src/main/assets/ear_${i}.jpg"
           done
           test -s android/app/src/main/assets/skin_detail.jpg
       - name: Compile native Android application
@@ -96,6 +97,7 @@ jobs:
           path: |
             android/app/src/main/assets/skin_0.jpg
             android/app/src/main/assets/scalp_0.jpg
+            android/app/src/main/assets/ear_0.jpg
             android/app/src/main/assets/skin_detail.jpg
           if-no-files-found: error
       - name: Upload Android APK
