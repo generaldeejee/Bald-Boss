@@ -165,40 +165,44 @@ public final class HudView extends View {
                     button(c,"BACK TO APPLICANTS","RULES",126,236,354,267,true);
                 }
             }else if(game.phase==GameState.PLAY){
-                panel(c,6,6,474,42,0xd0140e29,9);
-                text(c,"THE ELITE BALD MAN CLUB",17,25,15,GOLD,false);
-                text(c,game.highDetail?"HD DELUXE":"STANDARD",363,25,11,PURPLE,false);
-                panel(c,6,47,474,80,0xc0101b2a,7);
+                // v2.3: total UI occlusion shrunk to 38px top and 29px bottom.
+                // The entire central game field is now exposed for grooming.
+                panel(c,4,3,476,31,0xb10b1322,6);
+                text(c,(game.mode==GameState.ZEN?"ZEN ":"TIME ")+format(game.timeLeft()),
+                     12,21,13,GOLD,false);
+                text(c,"SCORE "+game.score+"  /  x"+game.combo,170,21,12,WHITE,true);
+                text(c,game.percentage()+"%  •  "+(game.hairs.length-game.removed)+" HAIRS",
+                     463,21,12,MINT,true);
+                // Five-pixel gold and mint progress track, not a floating panel.
                 float fraction=(float)game.removed/Math.max(1,game.hairs.length);
-                panel(c,14,55,306,68,0xff3a4256,3);
-                panel(c,14,55,14+292*fraction,68,MINT,3);
-                text(c,game.percentage()+"% SHAVED",320,67,12,WHITE,false);
-                panel(c,6,84,149,108,0xbe101829,6);
-                text(c,(game.mode==GameState.ZEN?"TIME ":"LEFT ")+format(game.timeLeft()),16,101,13,GOLD,false);
-                panel(c,154,84,332,108,0xbe101829,6);
-                text(c,"SCORE "+game.score+"  COMBO "+game.combo,165,101,12,WHITE,false);
-                panel(c,337,84,474,108,0xbe101829,6);
-                text(c,(game.hairs.length-game.removed)+" HAIRS LEFT",347,101,12,MINT,false);
+                panel(c,12,34,468,38,0x99535b6c,2);
+                if(fraction>0)panel(c,12,34,12+456*fraction,38,MINT,2);
+                // The head occupies the unobstructed y=39..239 play window.
                 if(game.paused){
-                    panel(c,110,113,372,193,0xf015102b,14);
-                    text(c,"CLUB SESSION PAUSED",241,146,21,GOLD,true);
-                    text(c,"TAP RESUME TO CONTINUE",241,172,12,WHITE,true);
+                    panel(c,112,106,368,181,0xe9120e29,11);
+                    text(c,"SESSION PAUSED",240,137,20,GOLD,true);
+                    text(c,"TAP RESUME TO CONTINUE",240,157,11,WHITE,true);
                 }else if(game.cursorX>=0){
                     float x=game.cursorX*480f/Math.max(1,getWidth());
                     float y=game.cursorY*270f/Math.max(1,getHeight());
-                    color(GOLD);p.setStyle(Paint.Style.STROKE);p.setStrokeWidth(1.8f);
-                    c.drawCircle(x,y,12,p);
-                    color(MINT);c.drawCircle(x,y,2.5f,p);
+                    color(GOLD);
+                    p.setStyle(Paint.Style.STROKE);
+                    p.setStrokeWidth(1.5f);
+                    c.drawCircle(x,y,10,p);
+                    color(MINT);
+                    c.drawCircle(x,y,2.0f,p);
                 }
-                panel(c,5,222,475,266,0xdd1a132f,9);
-                button(c,"TURN L","LEFT",10,227,65,259,false);
-                button(c,"TURN R","RIGHT",69,227,124,259,false);
-                button(c,"UP","UP",128,227,166,259,false);
-                button(c,"DOWN","DOWN",170,227,220,259,false);
-                button(c,"ZOOM","ZOOM",224,227,279,259,false);
-                button(c,"HINT","HINT",283,227,330,259,false);
-                button(c,game.paused?"RESUME":"PAUSE","PAUSE",334,227,394,259,false);
-                button(c,"MENU","MENU",398,227,471,259,false);
+                // Semi-transparent one-line controller dock. Gesture shaving
+                // and two-finger orbit work across all of the empty center.
+                panel(c,4,241,476,269,0xc01b1630,5);
+                button(c,"TURN L","LEFT",6,244,62,266,false);
+                button(c,"TURN R","RIGHT",64,244,121,266,false);
+                button(c,"UP","UP",123,244,165,266,false);
+                button(c,"DOWN","DOWN",167,244,215,266,false);
+                button(c,"ZOOM","ZOOM",217,244,276,266,false);
+                button(c,"HINT","HINT",278,244,322,266,false);
+                button(c,game.paused?"RESUME":"PAUSE","PAUSE",324,244,397,266,false);
+                button(c,"MENU","MENU",399,244,474,266,false);
             }else if(game.phase==GameState.WIN){
                 art(c,victoryArt);
                 sparkles(c);
