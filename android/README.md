@@ -48,3 +48,33 @@ Launcher icons are generated at 5 densities using the project's original custom 
 - AUDIO: the same original PSP music masters are now regenerated as 44.1kHz stereo Ogg Vorbis quality 7. The title and victory use vocals, gameplay uses the instrumental. Effects include classic clipper, enhanced shave, victory voice, menu stingers and synthesized crowd applause.
 - ASSETS: The code creates reproducible club scene backgrounds with Pillow. A separately packaged Deluxe APK may substitute the high-resolution commissioned artwork (club_intro, club_menu, club_victory and club_crest) from the user's image-generation session. This repository deliberately does not claim that generated art is contained in its source tree.
 - Android minSdk23 / targetSdk35; no internet permission and no telemetry.
+
+
+## Bald Elite Android v2.1 — THE BALD MAN CLUB
+
+This update adds a second chapter of the club invitation, an interactive
+"About the Club" panel in the applicant menu, rotating original humour, new
+victory/failure captions, and anatomy improvements to the actual 3D mesh.
+
+* Club invitation: "Only the perfectly bald may enter"; four club rules
+  and explicit acknowledgement before admission to the game menu.
+* Club rules and lore: no visible hair; every follicle inspected; a glossy
+  dome counts as a badge of honour; absolutely no combs.
+* Changing jokes: "We do not negotiate with follicles", "Hair today. Gone today",
+  "Shampoo? We retired it in 1987", and others.
+* Victory: Council of Polished Scalps-approved quips, scores, confetti
+  and the original sung PSP soundtrack.
+* Failure: humorous rejection reasons, percent shaved and retry/menu.
+* Face mesh: 110x160 segments in Deluxe HD, 64x96 in Standard,
+  curved anatomical ears on both sides, improved cheekbones, jawline,
+  chin, eyebrow ridge and nose; applicant-specific skin details.
+* Face texture: 2048x2048 skin in HD, 1024x1024 Standard, extra pores,
+  age details and glossy scalp shader. Haircutting still uses GameState
+  as its source of truth, while the shader mesh is updated only as needed.
+* All premium scene images and original 44.1 kHz stereo PSP audio are kept.
+
+This version intentionally uses `com.baldelite.club` so it installs
+**alongside** v2.0 Deluxe without deleting its local saved high scores.
+High scores are not yet shared between different app IDs.
+
+See `android/RELEASE_NOTES_v2.1.md` for complete release notes.
