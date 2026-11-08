@@ -94,3 +94,28 @@ f=font(37);d.text((126,397),"BALD ELITE",font=f,fill="#fff0c2")
 dest=ASSETS/"club_crest.png"
 crest.save(dest,optimize=True)
 print(dest,dest.stat().st_size)
+
+# Definitive v2.7 icon generated AFTER legacy launcher generation.
+# Replaces the flat brown cartoon head with a gold-purple club crest.
+from PIL import ImageOps
+ICON=512
+lux=Image.new("RGBA",(ICON,ICON),(22,9,36,255))
+ds=ImageDraw.Draw(lux)
+for yy in range(ICON):
+    v=yy/(ICON-1)
+    ds.line([(0,yy),(ICON,yy)],fill=(int(26+20*v),int(8+8*v),int(47+16*v),255))
+ds.rounded_rectangle((14,14,498,498),radius=100,outline="#f8d183",width=15)
+ds.rounded_rectangle((28,28,484,484),radius=91,outline="#6e346f",width=9)
+logo=crest.copy().convert("RGBA")
+logo.thumbnail((450,450),Image.Resampling.LANCZOS)
+lux.alpha_composite(logo,((ICON-logo.width)//2,(ICON-logo.height)//2-12))
+ds=ImageDraw.Draw(lux)
+ds.rounded_rectangle((320,29,478,94),radius=21,fill="#41104e",outline="#fbd17a",width=5)
+f=font(38)
+ds.text((337,42),"V2.7",font=f,fill="#fff2ce",stroke_width=1,stroke_fill="#320b42")
+for dpi,px in [("mdpi",48),("hdpi",72),("xhdpi",96),("xxhdpi",144),("xxxhdpi",192)]:
+    folder=ROOT/"android/app/src/main/res"/("mipmap-"+dpi)
+    folder.mkdir(parents=True,exist_ok=True)
+    lux.resize((px,px),Image.Resampling.LANCZOS).save(folder/"ic_launcher.png")
+lux.save(ROOT/"android/generated/BaldElite-Gold-2.7.png")
+print("v2.7 premium gold and purple launcher icon installed, five densities.")
