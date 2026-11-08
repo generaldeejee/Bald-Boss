@@ -144,8 +144,8 @@ public final class HudView extends View {
                     color(0xffffffff);c.drawBitmap(crest,null,new RectF(10,2,60,50),p);
                 }
                 text(c,"BALD ELITE",65,25,20,GOLD,false);
-                textRight(c,"v2.6",464,24,13,MINT);
-                text(c,"V2.6 RESTORED • HEAD + HAIR + INSTRUMENTS",66,39,9,MINT,false);
+                textRight(c,"v2.7",464,24,13,MINT);
+                text(c,"V2.7 GOLD • HD HEAD + HAIR + BAND",66,39,9,MINT,false);
                 panel(c,13,60,218,203,0xe6161029,9);
                 text(c,"CLUB INITIATION",26,81,14,GOLD,false);
                 text(c,"APPLICANT  "+(game.candidate+1)+"/3",26,103,13,WHITE,false);
@@ -184,7 +184,7 @@ public final class HudView extends View {
                 panel(c,4,3,476,31,0xb10b1322,6);
                 text(c,(game.mode==GameState.ZEN?"ZEN ":"TIME ")+format(game.timeLeft()),
                      12,21,13,GOLD,false);
-                text(c,"2.6",122,21,10,MINT,false);
+                text(c,"2.7",122,21,10,MINT,false);
                 text(c,"SCORE "+game.score+"  /  x"+game.combo,236,21,11.5f,WHITE,true);
                 textRight(c,game.percentage()+"%  •  "+(game.hairs.length-game.removed)+" HAIRS",
                           466,21,11.5f,MINT);
