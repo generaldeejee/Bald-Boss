@@ -83,6 +83,20 @@ jobs:
           test -s android/app/src/main/assets/skin_detail.jpg
       - name: Compile native Android application
         run: gradle -p android --no-daemon --stacktrace :app:assembleDebug
+      - name: Export official Android APK signing and alignment tools
+        run: |
+          set -eux
+          test -s "${ANDROID_HOME}/build-tools/35.0.0/lib/apksigner.jar"
+          test -x "${ANDROID_HOME}/build-tools/35.0.0/zipalign"
+          mkdir -p signing-tools
+          cp "${ANDROID_HOME}/build-tools/35.0.0/lib/apksigner.jar" signing-tools/
+          cp "${ANDROID_HOME}/build-tools/35.0.0/zipalign" signing-tools/
+      - name: Upload Android signing tools for locally verified premium packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: BaldElite-Android-Official-Signing-Tools
+          path: signing-tools/
+          if-no-files-found: error
       - name: Verify installable APK
         run: |
           test -s android/app/build/outputs/apk/debug/app-debug.apk
